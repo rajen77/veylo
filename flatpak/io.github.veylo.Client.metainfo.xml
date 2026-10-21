@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.veylo.Client</id>
+  <name>Veylo</name>
+  <summary>Lightweight streaming desktop client</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>
+      A lightweight streaming desktop client for Linux. It wraps the official
+      Disney+ web player in a dedicated Chromium shell with Widevine support,
+      hardware video decoding, MPRIS media controls and a tray icon.
+    </p>
+    <p>
+      This is an unofficial, community-built client. It is not affiliated with,
+      endorsed by, or sponsored by The Walt Disney Company. Disney+ is a
+      trademark of Disney Enterprises, Inc. A valid Disney+ subscription is
+      required, and the app simply plays the official web player.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.veylo.Client.desktop</launchable>
+  <content_rating type="oars-1.1"/>
+  <categories>
+    <category>AudioVideo</category>
+    <category>Video</category>
+    <category>Player</category>
+  </categories>
+  <releases>
+    <release version="0.1.0" date="2026-01-01"/>
+  </releases>
+</component>

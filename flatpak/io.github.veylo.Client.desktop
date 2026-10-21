@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Veylo
+Comment=Lightweight streaming desktop client
+Exec=run.sh %U
+Terminal=false
+Type=Application
+Icon=io.github.veylo.Client
+Categories=AudioVideo;Video;Player;
+Keywords=veylo;streaming;video;player;
+StartupNotify=true
+StartupWMClass=io.github.veylo.Client

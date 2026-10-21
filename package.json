@@ -1,0 +1,39 @@
+{
+  "name": "veylo",
+  "version": "0.1.0",
+  "description": "Lightweight Disney+ desktop client for Linux, built on Electron for Content Security (Widevine).",
+  "license": "MIT",
+  "private": true,
+  "main": "src/main.js",
+  "homepage": "https://github.com/veylo/veylo",
+  "author": {
+    "name": "Veylo contributors",
+    "email": "maintainers@veylo.invalid"
+  },
+  "desktopName": "veylo.desktop",
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js",
+    "start": "node scripts/launch.js",
+    "start:debug": "node scripts/launch.js --veylo-diagnostics",
+    "icons": "node scripts/generate-icons.js",
+    "lint": "eslint .",
+    "pack": "npm run icons && electron-builder --linux dir",
+    "dist": "npm run icons && electron-builder --linux AppImage tar.xz",
+    "dist:deb": "npm run icons && electron-builder --linux deb",
+    "dist:rpm": "npm run icons && electron-builder --linux rpm",
+    "dist:pacman": "npm run icons && electron-builder --linux pacman",
+    "dist:all": "npm run icons && electron-builder --linux",
+    "flatpak": "bash scripts/build-flatpak.sh"
+  },
+  "dependencies": {
+    "mpris-service": "^2.1.0"
+  },
+  "devDependencies": {
+    "electron": "https://github.com/castlabs/electron-releases#v44.5.1+wvcus",
+    "electron-builder": "^26.0.12",
+    "eslint": "^9.15.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

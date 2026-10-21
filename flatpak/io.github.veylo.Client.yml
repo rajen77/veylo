@@ -1,0 +1,124 @@
+# Flatpak manifest for Veylo.
+#
+# Build with:  npm run flatpak
+#
+# The Electron runtime comes from the castLabs fork ("Electron for Content
+# Security"), the only Electron distribution that can play Widevine protected
+# content on Linux. The Widevine CDM itself is deliberately NOT bundled: Electron
+# downloads it at runtime from Google's component service, and redistributing it
+# would breach the Widevine licence.
+app-id: io.github.veylo.Client
+runtime: org.freedesktop.Platform
+runtime-version: '26.08'
+sdk: org.freedesktop.Sdk
+base: org.electronjs.Electron2.BaseApp
+base-version: '26.08'
+command: run.sh
+separate-locales: false
+
+# The app is a single-site browser: everything it displays is the official
+# Disney+ web player. No shell, no host filesystem and no host D-Bus beyond the
+# handful of names needed for media keys and the tray icon.
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --socket=pulseaudio
+  # GPU access: compositing, and VA-API decoding on NVIDIA/Intel/AMD.
+  - --device=dri
+  # MPRIS: own the player name so media keys and desktop applets bind to us.
+  - --own-name=org.mpris.MediaPlayer2.veylo
+  # Media keys are routed through these services on GNOME, KDE and MATE.
+  - --talk-name=org.gnome.SettingsDaemon.MediaKeys
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --talk-name=com.canonical.indicator.application
+  - --talk-name=org.ayatana.indicator.application
+  - --env=XCURSOR_PATH=/run/host/user-share/icons:/run/host/share/icons
+
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.node24
+
+build-options:
+  append-path: /usr/lib/sdk/node24/bin
+  env:
+    NPM_CONFIG_LOGLEVEL: info
+
+modules:
+  - name: veylo
+    buildsystem: simple
+    build-options:
+      env:
+        XDG_CACHE_HOME: /run/build/veylo/flatpak-node/cache
+        npm_config_cache: /run/build/veylo/flatpak-node/npm-cache
+        npm_config_offline: 'true'
+    build-commands:
+      # Offline install from the vendored tarballs. Scripts are skipped on
+      # purpose: the only install script in the tree would download a second
+      # copy of Electron, which the BaseApp already provides.
+      - npm ci --offline --omit=dev --ignore-scripts
+      # Electron resolves its app bundle relative to its own binary, so the
+      # application lives in resources/app. This keeps the zypak invocation to
+      # "binary plus Chromium switches", which is all zypak accepts.
+      - install -d /app/main/electron
+      - cp -a electron/. /app/main/electron/
+      - install -d /app/main/electron/resources/app
+      - cp -a src assets package.json /app/main/electron/resources/app/
+      - cp -a node_modules /app/main/electron/resources/app/node_modules
+      - install -Dm755 run.sh /app/bin/run.sh
+      - install -Dm644 io.github.veylo.Client.desktop /app/share/applications/io.github.veylo.Client.desktop
+      - install -Dm644 io.github.veylo.Client.metainfo.xml /app/share/metainfo/io.github.veylo.Client.metainfo.xml
+      - install -Dm644 io.github.veylo.Client.png /app/share/icons/hicolor/512x512/apps/io.github.veylo.Client.png
+    sources:
+      # castLabs publishes one archive per architecture, so the right one has to
+      # be selected at build time. Flatpak matches only-arches against the
+      # architecture it is building for, which makes this manifest work for both
+      # x86_64 and aarch64 without a separate file.
+      - type: archive
+        url: https://github.com/castlabs/electron-releases/releases/download/v44.5.1%2Bwvcus/electron-v44.5.1+wvcus-linux-x64.zip
+        sha256: afa7d4ea49abf1e91c5be0f88cfe1abdb977ff3454d57658e90b004aacbde9cc
+        only-arches:
+          - x86_64
+        dest: electron
+      - type: archive
+        url: https://github.com/castlabs/electron-releases/releases/download/v44.5.1%2Bwvcus/electron-v44.5.1+wvcus-linux-arm64.zip
+        sha256: 4c8254f1719e7596e3e5661a2c7922591bd3c5eb2dacd74fb96b022ea291ea95
+        only-arches:
+          - aarch64
+        dest: electron
+      - type: file
+        path: ../package.json
+      - type: file
+        path: ../package-lock.json
+      - type: dir
+        path: ../src
+        dest: src
+      - type: dir
+        path: ../assets
+        dest: assets
+      - type: file
+        path: io.github.veylo.Client.desktop
+      - type: file
+        path: io.github.veylo.Client.metainfo.xml
+      - type: file
+        path: icons/io.github.veylo.Client.png
+      - node-sources.json
+      - type: script
+        dest-filename: run.sh
+        commands:
+          - export ZYPAK_EXPOSE_WIDEVINE_PATH="${XDG_CONFIG_HOME}/veylo/WidevineCdm"
+          - mkdir -p "${ZYPAK_EXPOSE_WIDEVINE_PATH}"
+          # zypak re-executes the binary and drops stdout, so logs go to a file
+          # that users can inspect when troubleshooting playback.
+          - export VEYLO_LOG_FILE="${XDG_STATE_HOME:-${XDG_DATA_HOME}}/veylo/client.log"
+          # zypak's "spawn" zygote strategy deadlocks with this Electron build:
+          # the helper blocks on the chroot handshake and no JavaScript ever
+          # runs. The "mimic" strategy works, so pin it explicitly instead of
+          # letting the Flatpak portal version decide. See docs/FLATPAK.md.
+          - export ZYPAK_ZYGOTE_STRATEGY_SPAWN=0
+          # The GPU process cannot create its own Chromium sandbox underneath
+          # the Flatpak sandbox (bwrap already set up the namespaces), so GPU
+          # launches fail with error_code=1002 and Chromium aborts with
+          # "GPU process isn't usable". Disabling only the GPU sandbox keeps the
+          # renderer sandbox, and therefore Widevine's L3 path, intact.
+          - exec zypak-wrapper.sh /app/main/electron/electron --disable-gpu-sandbox "$@"

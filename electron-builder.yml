@@ -1,0 +1,103 @@
+appId: io.github.veylo.Client
+productName: Veylo
+copyright: Copyright (c) Veylo contributors
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - src/**/*
+  - assets/**/*
+  - package.json
+
+# The Widevine CDM must never be bundled: ECS downloads it on first launch from
+# Google's component service. Shipping it would breach the Widevine licence.
+asar: true
+
+# electron-builder would otherwise download stock Electron from
+# github.com/electron/electron, which has no binary for the "+wvcus" version and
+# therefore fails with a 404. That build also has no Widevine CDM, so packaging
+# it would produce a client that cannot play protected content at all. This
+# points the packager at the castLabs build that is already installed for
+# development, so the packaged app and the one run from source are identical.
+electronDist: node_modules/electron/dist
+
+linux:
+  target:
+    # AppImage is the universal payload: one file that runs on any distribution
+    # and carries its own libraries. The native formats below cover users who
+    # prefer their package manager.
+    - AppImage
+    - deb
+    - rpm
+    - pacman
+    # A plain archive for distributions none of the above serve (Gentoo, Void,
+    # NixOS, and anyone without root).
+    - tar.xz
+  category: AudioVideo
+  icon: build/icons
+  synopsis: Lightweight Disney+ desktop client
+  description: >-
+    A lightweight Disney+ desktop client for Linux. Wraps the official
+    Disney+ web player in a dedicated Chromium shell with Widevine support,
+    hardware video decoding, MPRIS media controls and a tray icon.
+  desktop:
+    entry:
+      Name: Veylo
+      Categories: AudioVideo;Video;Player;
+      Keywords: veylo;streaming;video;player;
+      StartupWMClass: veylo
+  executableName: veylo
+  syncDesktopName: true
+
+# Runtime dependencies are named per distribution, so each format needs its own
+# list. These are the packages Chromium itself requires; see
+# https://www.electronjs.org/docs/latest/tutorial/linux-desktop-integration
+deb:
+  # fpm builds the package metadata from these fields. Without explicit
+  # values it derives the vendor from the author string, including the
+  # e-mail address in angle brackets, which rpm rejects.
+  maintainer: Veylo contributors <maintainers@veylo.invalid>
+  vendor: Veylo
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libsecret-1-0
+
+rpm:
+  # fpm builds the package metadata from these fields. Without explicit
+  # values it derives the vendor from the author string, including the
+  # e-mail address in angle brackets, which rpm rejects.
+  maintainer: Veylo contributors <maintainers@veylo.invalid>
+  vendor: Veylo
+  depends:
+    - gtk3
+    - libnotify
+    - nss
+    - libXScrnSaver
+    - libXtst
+    - xdg-utils
+    - at-spi2-atk
+    - libsecret
+
+pacman:
+  # fpm builds the package metadata from these fields. Without explicit
+  # values it derives the vendor from the author string, including the
+  # e-mail address in angle brackets, which rpm rejects.
+  maintainer: Veylo contributors <maintainers@veylo.invalid>
+  vendor: Veylo
+  depends:
+    - gtk3
+    - libnotify
+    - nss
+    - libxss
+    - libxtst
+    - xdg-utils
+    - at-spi2-core
+    - libsecret
