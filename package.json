@@ -1,6 +1,6 @@
 {
   "name": "veylo",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Lightweight Disney+ desktop client for Linux, built on Electron for Content Security (Widevine).",
   "license": "MIT",
   "private": true,
