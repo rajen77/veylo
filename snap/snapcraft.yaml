@@ -1,0 +1,80 @@
+name: veylo
+base: core22
+adopt-info: veylo
+summary: Lightweight streaming desktop client for Linux (Disney+, Netflix)
+description: |
+  A lightweight streaming desktop client for Linux. Wraps the official web
+  players of supported services (Disney+, Netflix) in a dedicated Chromium
+  shell with Widevine support, hardware video decoding, MPRIS media controls
+  and a tray icon.
+grade: stable
+confinement: strict
+license: MIT
+
+# The snap is not built from source by snapcraft itself: the application is
+# packaged by electron-builder (which downloads the castLabs Electron build,
+# generates the icons and packs the snap template — see docs/SNAP.md), and
+# this part only runs that pipeline and unpacks its output. That keeps one
+# single source of truth for the snap layout: electron-builder's, the same one
+# the manual `snapcraft upload` releases are built from.
+parts:
+  veylo:
+    plugin: nil
+    source: .
+    # Node 20 is required by the project (package.json engines); the base
+    # system's nodejs is far older. The snap is fetched into the build
+    # environment, so no PPA or source build is needed.
+    build-snaps:
+      - node/20/stable
+    build-packages:
+      - squashfs-tools # unsquashfs, to unpack electron-builder's output
+    override-build: |
+      set -eu
+      cd "$CRAFT_PART_SRC"
+      npm ci
+      npm run icons
+      npm run dist:snap
+      unsquashfs -d "$CRAFT_PART_INSTALL" dist/veylo_*_amd64.snap
+      craftctl set version="$(node -p "require('./package.json').version")"
+
+apps:
+  veylo:
+    command: command.sh
+    desktop: meta/gui/veylo.desktop
+    plugs:
+      - desktop
+      - desktop-legacy
+      - home
+      - x11
+      - wayland
+      - unity7
+      - browser-support
+      - network
+      - gsettings
+      - audio-playback
+      - pulseaudio
+      - opengl
+    environment:
+      PATH: $SNAP/usr/sbin:$SNAP/usr/bin:$SNAP/sbin:$SNAP/bin:$PATH
+      SNAP_DESKTOP_RUNTIME: $SNAP/gnome-platform
+      LD_LIBRARY_PATH: $SNAP_LIBRARY_PATH:$SNAP/lib:$SNAP/usr/lib:$SNAP/lib/x86_64-linux-gnu:$SNAP/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH:$SNAP/lib:$SNAP/usr/lib:$SNAP/lib/x86_64-linux-gnu:$SNAP/usr/lib/x86_64-linux-gnu
+
+# The GTK/GNOME runtime and themes come from content snaps, mounted at
+# runtime — the same arrangement electron-builder's template uses.
+plugs:
+  gnome-3-28-1804:
+    interface: content
+    target: $SNAP/gnome-platform
+    default-provider: gnome-3-28-1804
+  gtk-3-themes:
+    interface: content
+    target: $SNAP/data-dir/themes
+    default-provider: gtk-common-themes
+  icon-themes:
+    interface: content
+    target: $SNAP/data-dir/icons
+    default-provider: gtk-common-themes
+  sound-themes:
+    interface: content
+    target: $SNAP/data-dir/sounds
+    default-provider: gtk-common-themes
