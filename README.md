@@ -252,4 +252,4 @@ values and dropping the file back in — no code change. See
 
 ## License
 
-MIT, as declared in `package.json`.
+MIT — see [LICENSE](./LICENSE), as also declared in `package.json`.
