@@ -1,33 +1,16 @@
 'use strict';
 
 const path = require('node:path');
-const { BrowserWindow, shell, app } = require('electron');
+const { BrowserWindow, shell } = require('electron');
 const log = require('./logger');
 const { isAllowed, isExternal } = require('./security');
 const { MAIN_WORLD_SOURCE } = require('./codecs');
+const { applyUserAgent } = require('./user-agent');
 const { load: loadWindowState, WindowStateKeeper } = require('./window-state');
 const { TitleBar } = require('./titlebar');
 
 const START_URL = 'https://www.disneyplus.com/';
 const PARTITION = 'persist:veylo';
-
-/**
- * The player refuses to start on a user agent that advertises Electron, so the
- * bundled token is stripped to present a plain, current Chrome UA. This is a
- * compatibility measure only; the client still loads Disney's own web app and
- * performs no request rewriting.
- */
-function normaliseUserAgent() {
-  const original = app.userAgentFallback;
-  const nameToken = app.name.replace(/[\\/]/g, '');
-  const cleaned = original
-    .replace(/\sElectron\/[\d.]+/, '')
-    .replace(new RegExp(`\\s${nameToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\/[\\d.]+`), '');
-  if (cleaned !== original) {
-    app.userAgentFallback = cleaned;
-    log.debug(`User agent presented to Disney+: ${cleaned}`);
-  }
-}
 
 class MainWindow {
   constructor({ onStateHint, titlebar } = {}) {
@@ -86,7 +69,10 @@ class MainWindow {
   }
 
   create() {
-    normaliseUserAgent();
+    // Presents the client as Chrome on Windows on every level Disney checks:
+    // request headers, client hints and the page-side navigator properties.
+    // See src/user-agent.js.
+    applyUserAgent(PARTITION);
 
     const restored = loadWindowState();
     this.restored = restored;
@@ -99,6 +85,9 @@ class MainWindow {
       minWidth: 480,
       minHeight: 360,
       title: 'Veylo',
+      // Sets _NET_WM_ICON so taskbars and docks can show the app icon even
+      // when they cannot match the window to its desktop entry.
+      icon: path.join(__dirname, '..', 'assets', 'icon.png'),
       backgroundColor: '#040814',
       // The window controls are drawn by the client itself, so the native frame
       // is off. Edge and corner resizing still work on X11 with this build, and

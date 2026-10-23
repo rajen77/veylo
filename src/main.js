@@ -34,7 +34,7 @@ function disallowUnusableSandbox() {
 
 let applied = { nvidia: false, nvidiaVaapi: false };
 
-// The window module reads app.userAgentFallback, so switches come first.
+// The switches have to exist before the ready event, so they come first.
 applied = applySwitches();
 
 const { MainWindow } = require('./window');

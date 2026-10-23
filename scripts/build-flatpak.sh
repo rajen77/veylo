@@ -85,7 +85,9 @@ flatpak --user remote-add --if-not-exists --no-gpg-verify "$LOCAL_REMOTE" "$(pwd
 # --if-not-exists keeps an existing remote untouched, so a stale URL (e.g. from
 # a checkout that moved or another project reusing the name) would survive and
 # the install would fail with "server has no summary file". Always sync the URL.
-flatpak --user remote-modify --url="$(pwd)/$REPO_DIR" "$LOCAL_REMOTE"
+# The scheme is required: a bare path makes flatpak reject the remote with
+# "URL using bad/illegal format or missing URL".
+flatpak --user remote-modify --url="file://$(pwd)/$REPO_DIR" "$LOCAL_REMOTE"
 if flatpak --user info "$APP_ID" >/dev/null 2>&1; then
   # A rebuild keeps the same version string, so a plain install would be a
   # no-op and leave the previous build in place. Update pulls the new commit.

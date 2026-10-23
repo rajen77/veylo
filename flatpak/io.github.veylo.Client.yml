@@ -116,6 +116,13 @@ modules:
           # runs. The "mimic" strategy works, so pin it explicitly instead of
           # letting the Flatpak portal version decide. See docs/FLATPAK.md.
           - export ZYPAK_ZYGOTE_STRATEGY_SPAWN=0
+          # Chromium writes the tray icon to a temp file (IconThemePath) on
+          # MATE instead of sending a DBus pixmap. The sandbox's /tmp and
+          # XDG_RUNTIME_DIR are private, so the StatusNotifierHost on the host
+          # cannot read the file and shows a "missing icon" placeholder. The
+          # per-app dir under XDG_RUNTIME_DIR/app is shared with the host, so
+          # point TMPDIR there to make the icon file visible outside the sandbox.
+          - export TMPDIR="${XDG_RUNTIME_DIR}/app/${FLATPAK_ID}"
           # The GPU process cannot create its own Chromium sandbox underneath
           # the Flatpak sandbox (bwrap already set up the namespaces), so GPU
           # launches fail with error_code=1002 and Chromium aborts with
