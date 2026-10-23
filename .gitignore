@@ -8,3 +8,5 @@ flatpak/.flatpak-builder/
 *.deb
 *.log
 .DS_Store
+screenshot.jpg
+veylo_snapstore.png
