@@ -40,7 +40,6 @@ parts:
 apps:
   veylo:
     command: command.sh
-    desktop: meta/gui/veylo.desktop
     plugs:
       - desktop
       - desktop-legacy
