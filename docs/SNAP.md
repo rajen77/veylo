@@ -14,21 +14,23 @@ npm run dist:all             # every format at once, snap included
 No `snapcraft` and no root are required: electron-builder's *template* path
 downloads a prebuilt snap template and packs everything with `mksquashfs`.
 
-## The launcher scripts are vendored (and why)
+## The template is unpacked by a hook (and why)
 
 electron-builder v26.15.3 downloads its snap template as a **tar archive** and
 passes the archive itself to `mksquashfs` instead of unpacking it. The archive
-is where `desktop-init.sh` and its two siblings live, yet the generated
-`command.sh` executes `$SNAP/desktop-init.sh` — so the snap as produced by the
-builder never starts.
+is where `desktop-init.sh` and its siblings **and** the runtime libraries
+(`usr/lib/x86_64-linux-gnu/libnspr4.so`, `libnss3.so`, …) live, yet the
+generated `command.sh` executes `$SNAP/desktop-init.sh` and the Electron binary
+links against those libraries — so the snap as produced by the builder dies
+with `error while loading shared libraries: libnspr4.so`.
 
-`scripts/after-pack.js` therefore copies the three scripts from
-`snap-launchers/` into the packed application directory (the snap target merges
-the top level of that directory into the snap root, which is exactly where
-`command.sh` looks for them). The copies are verbatim from
-electron-userland/electron-builder-binaries, release `snap-template-4.0-2`, and
-are only added when a snap is among the build targets, so the native packages
-stay clean.
+`scripts/after-pack.js` therefore downloads the same template the snap target
+uses (through the builder's own toolset downloader, so the cache and the
+checksum check are shared) and unpacks the tar into the packed application
+directory. The snap target merges the top level of that directory into the snap
+root, which is exactly where `command.sh` and the dynamic linker look for these
+files. The hook only runs when a snap is among the build targets, so the native
+packages stay clean.
 
 ## Testing locally
 

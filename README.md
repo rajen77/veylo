@@ -243,7 +243,6 @@ npm run pack       # unpacked directory
 src/          application code (main process, plus the preload that draws the title bar)
 locales/      interface strings, one JSON file per language
 scripts/      launcher, icon generation, packaging hooks, Flatpak build
-snap-launchers/  snap launcher scripts (vendored, see docs/SNAP.md)
 flatpak/      manifest, desktop entry, metainfo, vendored npm sources
 docs/         Flatpak, Snap and NVIDIA notes
 ```
