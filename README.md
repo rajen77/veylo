@@ -58,6 +58,7 @@ hardcoded (see [docs/NVIDIA.md](./docs/NVIDIA.md)).
 | Way to install | Fedora / openSUSE | Debian / Ubuntu | Arch | Anything else |
 | --- | --- | --- | --- | --- |
 | Flatpak | yes | yes | yes | yes — the most portable option |
+| Snap | yes | yes | yes | yes — what Ubuntu Software installs |
 | AppImage | yes | yes | yes | yes — single file, no root |
 | Native package | `rpm` | `deb` | `pacman` | `tar.xz` |
 | Build from source | yes | yes | yes | yes |
@@ -65,8 +66,12 @@ hardcoded (see [docs/NVIDIA.md](./docs/NVIDIA.md)).
 The build produces every format at once:
 
 ```bash
-npm run dist
+npm run dist:all
 ```
+
+Individual formats have their own scripts — `dist` (AppImage + tar.xz),
+`dist:deb`, `dist:rpm`, `dist:pacman`, `dist:snap` — and `npm run flatpak`
+builds the Flatpak. Snap specifics live in [docs/SNAP.md](./docs/SNAP.md).
 
 **AppImage carries its own copy of each library**, so it does not depend on the
 distribution's package versions. That makes it the most reliable choice on a
@@ -228,8 +233,8 @@ terminal.
 ## Building installers
 
 ```bash
-npm run dist   # AppImage and deb
-npm run pack   # unpacked directory
+npm run dist:all   # every format: AppImage, deb, rpm, pacman, tar.xz, snap
+npm run pack       # unpacked directory
 ```
 
 ## Project layout
@@ -237,9 +242,10 @@ npm run pack   # unpacked directory
 ```text
 src/          application code (main process, plus the preload that draws the title bar)
 locales/      interface strings, one JSON file per language
-scripts/      launcher, icon generation, Flatpak build
+scripts/      launcher, icon generation, packaging hooks, Flatpak build
+snap-launchers/  snap launcher scripts (vendored, see docs/SNAP.md)
 flatpak/      manifest, desktop entry, metainfo, vendored npm sources
-docs/         Flatpak and NVIDIA notes
+docs/         Flatpak, Snap and NVIDIA notes
 ```
 
 ## Translations

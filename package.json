@@ -22,6 +22,7 @@
     "dist:deb": "npm run icons && electron-builder --linux deb",
     "dist:rpm": "npm run icons && electron-builder --linux rpm",
     "dist:pacman": "npm run icons && electron-builder --linux pacman",
+    "dist:snap": "npm run icons && electron-builder --linux snap",
     "dist:all": "npm run icons && electron-builder --linux",
     "flatpak": "bash scripts/build-flatpak.sh"
   },

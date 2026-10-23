@@ -12,6 +12,9 @@ files:
   - locales/**/*
   - package.json
 
+# Copies the snap launcher scripts into the packed app. See scripts/after-pack.js.
+afterPack: scripts/after-pack.js
+
 # The Widevine CDM must never be bundled: ECS downloads it on first launch from
 # Google's component service. Shipping it would breach the Widevine licence.
 asar: true
@@ -23,6 +26,12 @@ asar: true
 # points the packager at the castLabs build that is already installed for
 # development, so the packaged app and the one run from source are identical.
 electronDist: node_modules/electron/dist
+
+# Snap-specific fields. Only `summary` is set: plugs stay at their defaults
+# on purpose, because a customised plug list makes electron-builder drop its
+# template path and shell out to the snapcraft CLI (which is not installed).
+snap:
+  summary: Lightweight streaming desktop client for Linux (Disney+, Netflix)
 
 linux:
   target:
@@ -36,6 +45,9 @@ linux:
     # A plain archive for distributions none of the above serve (Gentoo, Void,
     # NixOS, and anyone without root).
     - tar.xz
+    # What the Snap Store (and with it Ubuntu Software) distributes. Built by
+    # `npm run dist:snap`; see docs/SNAP.md.
+    - snap
   category: AudioVideo
   icon: build/icons
   synopsis: Lightweight streaming desktop client
