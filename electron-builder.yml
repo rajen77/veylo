@@ -9,6 +9,7 @@ directories:
 files:
   - src/**/*
   - assets/**/*
+  - locales/**/*
   - package.json
 
 # The Widevine CDM must never be bundled: ECS downloads it on first launch from

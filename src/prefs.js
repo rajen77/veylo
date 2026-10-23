@@ -7,13 +7,15 @@ const log = require('./logger');
 const { DEFAULT_SERVICE_ID, getService } = require('./services');
 
 /**
- * The choices that are not window geometry: which service was used last, and
- * whether it should open without asking. Window state has its own file (see
- * src/window-state.js); keeping these apart means neither can corrupt the
- * other, and this file stays small enough to edit by hand.
+ * The choices that are not window geometry: which service was used last,
+ * whether it should open without asking, and which interface language to use
+ * (`auto` follows the system locale; a code such as `de` pins it). Window state
+ * has its own file (see src/window-state.js); keeping these apart means neither
+ * can corrupt the other, and this file stays small enough to edit by hand.
  *
  * An unknown or removed service id falls back to the default rather than
- * being passed on: a stale id must not produce a window with no page.
+ * being passed on: a stale id must not produce a window with no page. An
+ * unknown language is left to src/i18n.js, which falls back to English.
  */
 
 const FILE_NAME = 'prefs.json';
@@ -36,6 +38,7 @@ function load(file = prefsFile()) {
   return {
     lastServiceId: getService(raw.lastServiceId) ? raw.lastServiceId : DEFAULT_SERVICE_ID,
     autoOpen: raw.autoOpen === true,
+    language: typeof raw.language === 'string' && raw.language ? raw.language : 'auto',
   };
 }
 
@@ -43,7 +46,7 @@ function save(prefs, file = prefsFile()) {
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, `${JSON.stringify(prefs, null, 2)}\n`);
-    log.debug(`Prefs saved: last=${prefs.lastServiceId} autoOpen=${prefs.autoOpen}`);
+    log.debug(`Prefs saved: last=${prefs.lastServiceId} autoOpen=${prefs.autoOpen} language=${prefs.language}`);
   } catch (err) {
     log.warn(`Prefs could not be saved to ${file}: ${err.message}`);
   }

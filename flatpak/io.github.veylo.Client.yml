@@ -64,7 +64,7 @@ modules:
       - install -d /app/main/electron
       - cp -a electron/. /app/main/electron/
       - install -d /app/main/electron/resources/app
-      - cp -a src assets package.json /app/main/electron/resources/app/
+      - cp -a src assets locales package.json /app/main/electron/resources/app/
       - cp -a node_modules /app/main/electron/resources/app/node_modules
       - install -Dm755 run.sh /app/bin/run.sh
       - install -Dm644 io.github.veylo.Client.desktop /app/share/applications/io.github.veylo.Client.desktop
@@ -97,6 +97,9 @@ modules:
       - type: dir
         path: ../assets
         dest: assets
+      - type: dir
+        path: ../locales
+        dest: locales
       - type: file
         path: io.github.veylo.Client.desktop
       - type: file

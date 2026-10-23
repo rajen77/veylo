@@ -283,12 +283,25 @@ const TITLEBAR_ID = 'veylo-titlebar';
 const TITLEBAR_HEIGHT = 36;
 
 const TITLEBAR_BUTTONS = [
-  { id: 'menu', label: 'Menu', channel: 'window:titlebar:menu' },
-  { id: 'fullscreen', label: 'Fullscreen', channel: 'window:titlebar:fullscreen' },
-  { id: 'minimize', label: 'Minimize', channel: 'window:titlebar:minimize' },
-  { id: 'maximize', label: 'Maximize', channel: 'window:titlebar:maximize' },
-  { id: 'close', label: 'Close', channel: 'window:titlebar:close', danger: true },
+  { id: 'menu', channel: 'window:titlebar:menu' },
+  { id: 'fullscreen', channel: 'window:titlebar:fullscreen' },
+  { id: 'minimize', channel: 'window:titlebar:minimize' },
+  { id: 'maximize', channel: 'window:titlebar:maximize' },
+  { id: 'close', channel: 'window:titlebar:close', danger: true },
 ];
+
+// The control labels in English. The main process replaces the whole set
+// through 'veylo:titlebar-labels' before the first load: the translations live
+// in locales/*.json and this preload is sandboxed, so it cannot read them.
+let titlebarLabels = {
+  menu: 'Menu',
+  fullscreen: 'Fullscreen',
+  exitFullscreen: 'Exit fullscreen',
+  minimize: 'Minimize',
+  maximize: 'Maximize',
+  restore: 'Restore',
+  close: 'Close',
+};
 
 const TITLEBAR_ICONS = {
   menu: '<path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
@@ -350,6 +363,17 @@ function titlebarIcon(name) {
   return `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">${TITLEBAR_ICONS[name] || ''}</svg>`;
 }
 
+/** The label a control shows right now; two of them follow the window state. */
+function titlebarLabelFor(id) {
+  if (id === 'fullscreen') {
+    return titlebarState.fullscreen ? titlebarLabels.exitFullscreen : titlebarLabels.fullscreen;
+  }
+  if (id === 'maximize') {
+    return titlebarState.maximized ? titlebarLabels.restore : titlebarLabels.maximize;
+  }
+  return titlebarLabels[id] || id;
+}
+
 /**
  * The application menu is a native popup, so it is placed in window coordinates
  * rather than by the page. The anchor is measured here, where the layout is
@@ -387,8 +411,9 @@ function createTitlebar() {
     button.className = 'veylo-titlebar-button';
     button.dataset.action = spec.id;
     button.dataset.danger = spec.danger ? 'true' : 'false';
-    button.title = spec.label;
-    button.setAttribute('aria-label', spec.label);
+    const label = titlebarLabelFor(spec.id);
+    button.title = label;
+    button.setAttribute('aria-label', label);
     button.innerHTML = titlebarIcon(spec.id);
     bar.appendChild(button);
     buttons.set(spec.id, button);
@@ -577,20 +602,28 @@ function buildTitlebar() {
   const text = titlebarState.title || 'Veylo';
   if (caption.textContent !== text) caption.textContent = text;
 
+  // The labels follow the active language and the window state, so they are
+  // re-applied on every refresh — including after a language change.
+  for (const spec of TITLEBAR_BUTTONS) {
+    const button = buttons.get(spec.id);
+    if (!button) continue;
+    const label = titlebarLabelFor(spec.id);
+    if (button.title !== label) {
+      button.title = label;
+      button.setAttribute('aria-label', label);
+    }
+  }
+
   const fullscreenButton = buttons.get('fullscreen');
-  const fullscreenLabel = titlebarState.fullscreen ? 'Exit fullscreen' : 'Fullscreen';
-  if (fullscreenButton.title !== fullscreenLabel) {
-    fullscreenButton.title = fullscreenLabel;
-    fullscreenButton.setAttribute('aria-label', fullscreenLabel);
-    fullscreenButton.innerHTML = titlebarIcon(titlebarState.fullscreen ? 'exitFullscreen' : 'fullscreen');
+  const fullscreenIcon = titlebarIcon(titlebarState.fullscreen ? 'exitFullscreen' : 'fullscreen');
+  if (fullscreenButton && fullscreenButton.innerHTML !== fullscreenIcon) {
+    fullscreenButton.innerHTML = fullscreenIcon;
   }
 
   const maximizeButton = buttons.get('maximize');
-  const maximizeLabel = titlebarState.maximized ? 'Restore' : 'Maximize';
-  if (maximizeButton.title !== maximizeLabel) {
-    maximizeButton.title = maximizeLabel;
-    maximizeButton.setAttribute('aria-label', maximizeLabel);
-    maximizeButton.innerHTML = titlebarIcon(titlebarState.maximized ? 'restore' : 'maximize');
+  const maximizeIcon = titlebarIcon(titlebarState.maximized ? 'restore' : 'maximize');
+  if (maximizeButton && maximizeButton.innerHTML !== maximizeIcon) {
+    maximizeButton.innerHTML = maximizeIcon;
   }
 
   // In fullscreen the strip is hidden so the video fills the screen, and it is
@@ -719,6 +752,14 @@ function start() {
   // own suffix from the document title. Sent before the first load.
   ipcRenderer.on('service:name', (_event, name) => {
     if (typeof name === 'string' && name) window.__veyloService = name;
+  });
+
+  // The title-bar labels of the active language. Sent before the first load and
+  // again whenever the language is switched at runtime.
+  ipcRenderer.on('veylo:titlebar-labels', (_event, labels) => {
+    if (!labels || typeof labels !== 'object') return;
+    titlebarLabels = { ...titlebarLabels, ...labels };
+    if (titlebarParts && titlebarParts.bar && titlebarParts.bar.isConnected) buildTitlebar();
   });
 
   window.addEventListener('beforeunload', () => {

@@ -7,7 +7,7 @@ const flags = require('./flags');
 const { applySwitches } = flags;
 const { shouldDisableSandbox } = require('./sandbox');
 
-const { app, components, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, components, ipcMain, Menu } = require('electron');
 const log = require('./logger');
 
 // Chromium cannot start without a usable sandbox, and a missing one kills the
@@ -45,6 +45,7 @@ const { buildMenu } = require('./menu');
 const { SERVICES, getService, resolveService } = require('./services');
 const prefsStore = require('./prefs');
 const { pickService, focusPicker } = require('./picker');
+const i18n = require('./i18n');
 
 // A second instance would create a competing MPRIS entry and a second Widevine
 // session, so hand focus back to the running one instead. While the service
@@ -129,6 +130,21 @@ const tray = new TrayController({
 });
 
 /**
+ * Applies the active language everywhere it can change without a restart: the
+ * tray labels and the title-bar labels of every open window. The menu is
+ * rebuilt by the caller (its labels are only read while it is built), and the
+ * chooser exists only during startup, where it reads the language itself.
+ */
+function applyLanguage() {
+  i18n.setLanguage(i18n.resolve(prefs.language, app.getLocale()));
+  tray.rebuild();
+  const labels = i18n.titlebarLabels();
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send('veylo:titlebar-labels', labels);
+  }
+}
+
+/**
  * Rebuilds the application menu so that the service radio buttons and the
  * "open on startup" checkbox show the current state. Called after every change
  * rather than only at startup, because the menu is built once.
@@ -142,6 +158,7 @@ function rebuildMenu() {
     services: SERVICES,
     activeServiceId: activeService.id,
     autoOpen: prefs.autoOpen,
+    languagePref: prefs.language,
     onSwitchService: (id) => {
       switchService(id).catch((err) => log.error('Service switch failed:', err.message));
     },
@@ -150,6 +167,14 @@ function rebuildMenu() {
       prefsStore.save(prefs);
       log.info(`Open on startup: ${prefs.autoOpen ? 'on' : 'off'}`);
       rebuildMenu();
+    },
+    onSetLanguage: (value) => {
+      if (prefs.language === value) return;
+      prefs = { ...prefs, language: value };
+      prefsStore.save(prefs);
+      applyLanguage();
+      rebuildMenu();
+      log.info(`Language: ${i18n.language()} (preference: ${prefs.language})`);
     },
   });
   syncFullscreenMenuItem();
@@ -239,6 +264,10 @@ app.whenReady().then(async () => {
   log.info(`Veylo ${app.getVersion()}`);
   log.info(`Electron ${process.versions.electron}, Chromium ${process.versions.chrome}`);
   log.info(`Service: ${activeService.name} (auto-open ${prefs.autoOpen ? 'on' : 'off'})`);
+  // Resolved before anything is shown: the chooser, the menu and the title bar
+  // all read the language while they are built.
+  i18n.setLanguage(i18n.resolve(prefs.language, app.getLocale()));
+  log.info(`Language: ${i18n.language()} (preference: ${prefs.language}, system: ${app.getLocale()})`);
   if (process.platform !== 'linux') {
     log.warn('This client targets Linux; other platforms are untested.');
   }

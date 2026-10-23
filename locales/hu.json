@@ -1,0 +1,102 @@
+{
+  "_meta": {
+    "code": "hu",
+    "name": "Magyar"
+  },
+  "menu": {
+    "playback": {
+      "title": "Lejátszás",
+      "playPause": "Lejátszás / Szünet",
+      "stop": "Leállítás",
+      "next": "Következő epizód",
+      "previous": "Előző epizód",
+      "forward": "Ugrás előre 10 mp",
+      "back": "Ugrás vissza 10 mp",
+      "volumeUp": "Hangerő fel",
+      "volumeDown": "Hangerő le",
+      "mute": "Némítás ki/be"
+    },
+    "service": {
+      "title": "Streaming szolgáltatás",
+      "autoOpen": "Indításkor az utolsó szolgáltatás megnyitása"
+    },
+    "language": {
+      "title": "Nyelv",
+      "auto": "Automatikus"
+    },
+    "view": {
+      "title": "Nézet",
+      "fullscreen": "Teljes képernyő",
+      "fullscreenAlt": "Teljes képernyő (alternatív billentyűkombináció)",
+      "pip": "Kép a képben",
+      "reload": "Újratöltés",
+      "forceReload": "Kényszerített újratöltés",
+      "actualSize": "Tényleges méret",
+      "zoomIn": "Nagyítás",
+      "zoomOut": "Kicsinyítés"
+    },
+    "devTools": "Fejlesztői eszközök ki/be",
+    "help": {
+      "title": "Súgó",
+      "checkUpdates": "Frissítések keresése…",
+      "diagnostics": "Diagnosztika másolása",
+      "troubleshooting": "Hibaelhárítási útmutató",
+      "about": "A Veylo névjegye"
+    },
+    "file": {
+      "title": "Fájl",
+      "quit": "Kilépés"
+    },
+    "ok": "Rendben"
+  },
+  "dialogs": {
+    "diagnostics": {
+      "title": "Diagnosztika",
+      "message": "A diagnosztika a vágólapra másolva."
+    },
+    "about": {
+      "title": "Névjegy",
+      "detail": "Verzió {version}\n\nNem hivatalos, könnyű asztali kliens Linuxra. A támogatott streaming szolgáltatások hivatalos weblejátszóit jeleníti meg egy külön Chromium-környezetben, Widevine-támogatással.\n\nNem áll kapcsolatban egyetlen streaming szolgáltatással vagy annak tulajdonosával, és azok nem támogatják, nem szponzorálják. A Disney+ és a Netflix a tulajdonosuk védjegye. A választott szolgáltatás érvényes előfizetése szükséges."
+    },
+    "updates": {
+      "title": "Frissítések",
+      "notConfigured": "Nincs frissítési forrás beállítva.",
+      "notConfiguredFlatpak": "Ez a build Flatpak formájában érkezik, így a frissítések magán a Flatpaken keresztül érkeznek.\n\nFuttasd: flatpak update io.github.veylo.Client",
+      "notConfiguredEnv": "A frissítések ellenőrzéséhez állítsd be a VEYLO_UPDATE_FEED környezeti változót egy kiadási feed URL-jével.",
+      "upToDate": "A legfrissebb verziót használod ({version}).",
+      "failed": "Nem sikerült ellenőrizni a frissítéseket.",
+      "availableTitle": "Elérhető frissítés",
+      "availableMessage": "Elérhető a Veylo {version} verziója.",
+      "installed": "Telepített: {current}\nElérhető: {latest}",
+      "flatpakHint": "\n\nFuttasd egy terminálban a frissítéshez:\nflatpak update io.github.veylo.Client",
+      "buttons": {
+        "copyCommand": "Parancs másolása",
+        "openRelease": "A kiadási oldal megnyitása",
+        "later": "Később"
+      }
+    }
+  },
+  "picker": {
+    "heading": "Válassz streaming szolgáltatást",
+    "subtitle": "A Veylo a választott szolgáltatás hivatalos weblejátszóját nyitja meg.",
+    "lastUsed": "Legutóbb használt",
+    "autoOpen": "A szolgáltatás automatikus megnyitása indításkor",
+    "hint": "Ezt bármikor módosíthatod a Streaming szolgáltatás menüben."
+  },
+  "tray": {
+    "show": "Veylo megjelenítése ({service})",
+    "fullscreen": "Teljes képernyő",
+    "nowPlaying": "Most játszik: {title}",
+    "checkUpdates": "Frissítések keresése…",
+    "quit": "Kilépés"
+  },
+  "titlebar": {
+    "menu": "Menü",
+    "fullscreen": "Teljes képernyő",
+    "exitFullscreen": "Kilépés a teljes képernyőről",
+    "minimize": "Kicsinyítés",
+    "maximize": "Nagyítás",
+    "restore": "Visszaállítás",
+    "close": "Bezárás"
+  }
+}

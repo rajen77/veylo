@@ -22,6 +22,8 @@ browser spends on everything else.
 - A startup chooser for the streaming service, a menu entry to switch between
   them, and an option to open the last used one automatically
 - Each service keeps its own session, so sign-ins stay separate
+- Interface in English, Hungarian and German: it follows the system language,
+  and the Language menu overrides it (see [Translations](#translations))
 - Widevine playback through castLabs Electron (`SW_SECURE_DECODE`)
 - VA-API hardware video decoding, including the NVIDIA shim path
 - MPRIS integration, so media keys and desktop widgets control playback
@@ -232,10 +234,19 @@ npm run pack   # unpacked directory
 
 ```text
 src/          application code (main process, plus the preload that draws the title bar)
+locales/      interface strings, one JSON file per language
 scripts/      launcher, icon generation, Flatpak build
 flatpak/      manifest, desktop entry, metainfo, vendored npm sources
 docs/         Flatpak and NVIDIA notes
 ```
+
+## Translations
+
+Every user-visible string lives in [`locales/`](./locales), one JSON file per
+language, with `en.json` as the base language. The files are picked up
+automatically, so adding a language means copying `en.json`, translating the
+values and dropping the file back in — no code change. See
+[`locales/README.md`](./locales/README.md) for the steps.
 
 ## License
 

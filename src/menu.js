@@ -3,6 +3,7 @@
 const { app, Menu, clipboard, dialog } = require('electron');
 const log = require('./logger');
 const { isDebug } = require('./logger');
+const { t, available: availableLanguages } = require('./i18n');
 
 /**
  * Builds the application menu. On Linux this is the only place accelerators can
@@ -17,8 +18,10 @@ function buildMenu({
   services = [],
   activeServiceId = '',
   autoOpen = false,
+  languagePref = 'auto',
   onSwitchService = () => {},
   onToggleAutoOpen = () => {},
+  onSetLanguage = () => {},
 }) {
   const send = (command) => () => media.emit(command);
   const isMac = process.platform === 'darwin';
@@ -30,25 +33,25 @@ function buildMenu({
   }
 
   template.push({
-    label: 'Playback',
+    label: t('menu.playback.title'),
     submenu: [
-      { label: 'Play / Pause', accelerator: 'Space', click: send('playpause') },
-      { label: 'Stop', click: send('stop') },
+      { label: t('menu.playback.playPause'), accelerator: 'Space', click: send('playpause') },
+      { label: t('menu.playback.stop'), click: send('stop') },
       { type: 'separator' },
-      { label: 'Next Episode', accelerator: 'CommandOrControl+Right', click: send('next') },
-      { label: 'Previous Episode', accelerator: 'CommandOrControl+Left', click: send('previous') },
+      { label: t('menu.playback.next'), accelerator: 'CommandOrControl+Right', click: send('next') },
+      { label: t('menu.playback.previous'), accelerator: 'CommandOrControl+Left', click: send('previous') },
       { type: 'separator' },
-      { label: 'Skip Forward 10s', accelerator: 'Right', click: () => media.emit('seek', 10_000_000) },
-      { label: 'Skip Back 10s', accelerator: 'Left', click: () => media.emit('seek', -10_000_000) },
+      { label: t('menu.playback.forward'), accelerator: 'Right', click: () => media.emit('seek', 10_000_000) },
+      { label: t('menu.playback.back'), accelerator: 'Left', click: () => media.emit('seek', -10_000_000) },
       { type: 'separator' },
-      { label: 'Volume Up', accelerator: 'Up', click: () => media.adjustVolume(0.05) },
-      { label: 'Volume Down', accelerator: 'Down', click: () => media.adjustVolume(-0.05) },
-      { label: 'Toggle Mute', accelerator: 'M', click: () => media.toggleMute() },
+      { label: t('menu.playback.volumeUp'), accelerator: 'Up', click: () => media.adjustVolume(0.05) },
+      { label: t('menu.playback.volumeDown'), accelerator: 'Down', click: () => media.adjustVolume(-0.05) },
+      { label: t('menu.playback.mute'), accelerator: 'M', click: () => media.toggleMute() },
     ],
   });
 
   template.push({
-    label: 'Streaming Service',
+    label: t('menu.service.title'),
     submenu: [
       ...services.map((service) => ({
         id: `service-${service.id}`,
@@ -60,7 +63,7 @@ function buildMenu({
       { type: 'separator' },
       {
         id: 'service-auto-open',
-        label: 'Open Last Service on Startup',
+        label: t('menu.service.autoOpen'),
         type: 'checkbox',
         checked: autoOpen,
         click: () => onToggleAutoOpen(),
@@ -68,14 +71,45 @@ function buildMenu({
     ],
   });
 
+  // One radio per locale file found in locales/, plus the automatic choice
+  // that follows the system language. The list comes from the directory, so a
+  // new translation shows up here without a code change.
+  //
+  // No separator between the automatic choice and the languages on purpose:
+  // Electron groups radio items up to the next separator, and a group without
+  // a checked item gets its first entry checked — which would mark a language
+  // as chosen while "Automatic" is the real state. One group keeps exactly one
+  // radio filled.
+  const languages = availableLanguages();
+  const languageListed = languages.some((entry) => entry.code === languagePref);
   template.push({
-    label: 'View',
+    label: t('menu.language.title'),
+    submenu: [
+      {
+        id: 'language-auto',
+        label: t('menu.language.auto'),
+        type: 'radio',
+        checked: !languageListed,
+        click: () => onSetLanguage('auto'),
+      },
+      ...languages.map((entry) => ({
+        id: `language-${entry.code}`,
+        label: entry.name,
+        type: 'radio',
+        checked: languagePref === entry.code,
+        click: () => onSetLanguage(entry.code),
+      })),
+    ],
+  });
+
+  template.push({
+    label: t('menu.view.title'),
     submenu: [
       {
         // A checkbox rather than a plain item so the menu shows which mode the
         // window is in; the title bar's fullscreen button is the other way in.
         id: 'view-fullscreen',
-        label: 'Fullscreen',
+        label: t('menu.view.fullscreen'),
         type: 'checkbox',
         checked: Boolean(window.window && window.window.isFullScreen()),
         accelerator: 'F11',
@@ -85,39 +119,41 @@ function buildMenu({
         // A second accelerator for the same action. F11 is the Linux
         // convention, Alt+Return the media-player one, and neither is claimed
         // by the page's own text fields.
-        label: 'Fullscreen (alternate shortcut)',
+        label: t('menu.view.fullscreenAlt'),
         visible: false,
         accelerator: 'Alt+Return',
         click: () => window.toggleFullscreen(),
       },
       {
-        label: 'Picture-in-Picture',
+        label: t('menu.view.pip'),
         accelerator: 'CommandOrControl+Shift+P',
         click: () => media.togglePinned(),
       },
       { type: 'separator' },
-      { role: 'reload', accelerator: 'CommandOrControl+R' },
-      { role: 'forceReload' },
+      // The roles keep their behaviour but bring their own label: role labels
+      // come from Chromium's baked-in strings and are always English.
+      { role: 'reload', label: t('menu.view.reload'), accelerator: 'CommandOrControl+R' },
+      { role: 'forceReload', label: t('menu.view.forceReload') },
       { type: 'separator' },
-      { role: 'resetZoom' },
-      { role: 'zoomIn' },
-      { role: 'zoomOut' },
+      { role: 'resetZoom', label: t('menu.view.actualSize') },
+      { role: 'zoomIn', label: t('menu.view.zoomIn') },
+      { role: 'zoomOut', label: t('menu.view.zoomOut') },
     ],
   });
 
   if (isDebug) {
-    template.push({ role: 'toggleDevTools' });
+    template.push({ role: 'toggleDevTools', label: t('menu.devTools') });
   }
 
   template.push({
-    label: 'Help',
+    label: t('menu.help.title'),
     submenu: [
       {
-        label: 'Check for Updates…',
+        label: t('menu.help.checkUpdates'),
         click: () => updater.check({ interactive: true }),
       },
       {
-        label: 'Copy Diagnostics',
+        label: t('menu.help.diagnostics'),
         click: () => {
           const info = [
             `Veylo ${app.getVersion()}`,
@@ -134,15 +170,15 @@ function buildMenu({
           clipboard.writeText(info);
           dialog.showMessageBox(window.window, {
             type: 'info',
-            title: 'Diagnostics',
-            message: 'Diagnostics copied to the clipboard.',
+            title: t('dialogs.diagnostics.title'),
+            message: t('dialogs.diagnostics.message'),
             detail: info,
-            buttons: ['OK'],
+            buttons: [t('menu.ok')],
           });
         },
       },
       {
-        label: 'Troubleshooting Guide',
+        label: t('menu.help.troubleshooting'),
         click: () => {
           log.info('Opening troubleshooting guide');
           const { shell } = require('electron');
@@ -151,22 +187,14 @@ function buildMenu({
       },
       { type: 'separator' },
       {
-        label: `About Veylo`,
+        label: t('menu.help.about'),
         click: () => {
           dialog.showMessageBox(window.window, {
             type: 'info',
-            title: 'About',
+            title: t('dialogs.about.title'),
             message: 'Veylo',
-            detail:
-              `Version ${app.getVersion()}\n\n` +
-              'An unofficial, lightweight desktop client for Linux. It displays ' +
-              'the official web players of supported streaming services in a ' +
-              'dedicated Chromium shell with Widevine support.\n\n' +
-              'Not affiliated with, endorsed by, or sponsored by any streaming ' +
-              'service or its owner. Disney+ and Netflix are trademarks of their ' +
-              'respective owners. A valid subscription to the chosen service is ' +
-              'required.',
-            buttons: ['OK'],
+            detail: t('dialogs.about.detail', { version: app.getVersion() }),
+            buttons: [t('menu.ok')],
           });
         },
       },
@@ -175,13 +203,23 @@ function buildMenu({
 
   if (!isMac) {
     template.push({
-      label: 'File',
-      submenu: [{ label: 'Quit', role: 'quit', accelerator: 'CommandOrControl+Q' }],
+      label: t('menu.file.title'),
+      submenu: [{ label: t('menu.file.quit'), role: 'quit', accelerator: 'CommandOrControl+Q' }],
     });
   }
 
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
+  if (isDebug) {
+    // Two levels deep: enough to see the whole interface at a glance when
+    // checking a translation or a rebuild.
+    const labels = template.flatMap((item) => (item.label
+      ? [item.label, ...(item.submenu || [])
+        .filter((child) => child.label)
+        .map((child) => `${item.label} ▸ ${child.label}`)]
+      : []));
+    log.debug(`Menu (${labels.length} items):`, labels.join(' | '));
+  }
   // Keeps the checkbox items honest after a service switch, which rebuilds the
   // window rather than the menu.
   for (const service of services) {

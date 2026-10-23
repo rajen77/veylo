@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { app, BrowserWindow, ipcMain, nativeImage } = require('electron');
 const log = require('./logger');
+const { t, language } = require('./i18n');
 
 /**
  * The startup chooser: a small frameless window that asks which streaming
@@ -71,14 +72,14 @@ function buildHtml({ services, lastServiceId }) {
         `<button class="card${last ? ' last' : ''}" type="button" data-id="${service.id}">`,
         icon ? `<img src="${icon}" alt="">` : '',
         `<span class="name">${escapeHtml(service.name)}</span>`,
-        last ? '<span class="badge">Last used</span>' : '',
+        last ? `<span class="badge">${escapeHtml(t('picker.lastUsed'))}</span>` : '',
         '</button>',
       ].join('');
     })
     .join('');
 
   return `<!doctype html>
-<html lang="en">
+<html lang="${language()}">
 <head>
 <meta charset="utf-8">
 <title>Veylo</title>
@@ -123,14 +124,14 @@ function buildHtml({ services, lastServiceId }) {
 </style>
 </head>
 <body>
-  <h1>Choose a streaming service</h1>
-  <p class="sub">Veylo opens the official web player of the service you pick.</p>
+  <h1>${escapeHtml(t('picker.heading'))}</h1>
+  <p class="sub">${escapeHtml(t('picker.subtitle'))}</p>
   <div class="cards">${cards}</div>
   <label class="auto">
     <input type="checkbox" id="auto">
-    <span>Open this service automatically on startup</span>
+    <span>${escapeHtml(t('picker.autoOpen'))}</span>
   </label>
-  <div class="hint">Change it any time from the Streaming Service menu.</div>
+  <div class="hint">${escapeHtml(t('picker.hint'))}</div>
   <script>
     (function () {
       var api = window.veyloPicker;

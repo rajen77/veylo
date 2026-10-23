@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const { app, dialog, shell } = require('electron');
 const log = require('./logger');
+const { t } = require('./i18n');
 
 const FLATPAK_INFO = '/.flatpak-info';
 const CHECK_DELAY_MS = 20_000;
@@ -77,12 +78,12 @@ class Updater {
       if (interactive) {
         await dialog.showMessageBox(this.window, {
           type: 'info',
-          title: 'Updates',
-          message: 'No update feed is configured.',
+          title: t('dialogs.updates.title'),
+          message: t('dialogs.updates.notConfigured'),
           detail: this.isFlatpak
-            ? 'This build is delivered as a Flatpak, so updates arrive through Flatpak itself.\n\nRun: flatpak update io.github.veylo.Client'
-            : 'Set the VEYLO_UPDATE_FEED environment variable to a release feed URL to enable update checks.',
-          buttons: ['OK'],
+            ? t('dialogs.updates.notConfiguredFlatpak')
+            : t('dialogs.updates.notConfiguredEnv'),
+          buttons: [t('menu.ok')],
         });
       }
       return { status: 'not-configured' };
@@ -103,9 +104,9 @@ class Updater {
       if (interactive) {
         await dialog.showMessageBox(this.window, {
           type: 'info',
-          title: 'Updates',
-          message: `You are running the latest version (${current}).`,
-          buttons: ['OK'],
+          title: t('dialogs.updates.title'),
+          message: t('dialogs.updates.upToDate', { version: current }),
+          buttons: [t('menu.ok')],
         });
       }
       return { status: 'current', current };
@@ -114,10 +115,10 @@ class Updater {
       if (interactive) {
         await dialog.showMessageBox(this.window, {
           type: 'warning',
-          title: 'Updates',
-          message: 'Could not check for updates.',
+          title: t('dialogs.updates.title'),
+          message: t('dialogs.updates.failed'),
           detail: err.message,
-          buttons: ['OK'],
+          buttons: [t('menu.ok')],
         });
       }
       return { status: 'error', error: err.message };
@@ -125,27 +126,38 @@ class Updater {
   }
 
   async promptUpdate(current, latest) {
-    const detail = this.isFlatpak
-      ? `Installed: ${current}\nAvailable: ${latest.version}\n\nRun this in a terminal to update:\nflatpak update io.github.veylo.Client`
-      : `Installed: ${current}\nAvailable: ${latest.version}`;
+    const detail =
+      t('dialogs.updates.installed', { current, latest: latest.version }) +
+      (this.isFlatpak ? t('dialogs.updates.flatpakHint') : '');
 
-    const buttons = this.isFlatpak ? ['Copy command', 'Open release page', 'Later'] : ['Open release page', 'Later'];
+    // The buttons are matched by id rather than by their text: the text is
+    // translated, the id is not.
+    const choices = this.isFlatpak
+      ? [
+        { id: 'copy', label: t('dialogs.updates.buttons.copyCommand') },
+        { id: 'release', label: t('dialogs.updates.buttons.openRelease') },
+        { id: 'later', label: t('dialogs.updates.buttons.later') },
+      ]
+      : [
+        { id: 'release', label: t('dialogs.updates.buttons.openRelease') },
+        { id: 'later', label: t('dialogs.updates.buttons.later') },
+      ];
     const { response } = await dialog.showMessageBox(this.window, {
       type: 'info',
-      title: 'Update available',
-      message: `Veylo ${latest.version} is available.`,
+      title: t('dialogs.updates.availableTitle'),
+      message: t('dialogs.updates.availableMessage', { version: latest.version }),
       detail,
-      buttons,
+      buttons: choices.map((choice) => choice.label),
       defaultId: 0,
-      cancelId: buttons.length - 1,
+      cancelId: choices.length - 1,
     });
 
-    const choice = buttons[response];
-    if (choice === 'Copy command') {
+    const choice = choices[response];
+    if (choice && choice.id === 'copy') {
       const { clipboard } = require('electron');
       clipboard.writeText('flatpak update io.github.veylo.Client');
       log.info('Flatpak update command copied to the clipboard');
-    } else if (choice === 'Open release page' && latest.htmlUrl) {
+    } else if (choice && choice.id === 'release' && latest.htmlUrl) {
       await shell.openExternal(latest.htmlUrl);
     }
   }

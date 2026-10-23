@@ -6,6 +6,7 @@ const log = require('./logger');
 const { isAllowed, isExternal } = require('./security');
 const { MAIN_WORLD_SOURCE } = require('./codecs');
 const { applyUserAgent } = require('./user-agent');
+const i18n = require('./i18n');
 const { load: loadWindowState, WindowStateKeeper } = require('./window-state');
 const { TitleBar } = require('./titlebar');
 const { resolveService } = require('./services');
@@ -186,6 +187,9 @@ class MainWindow {
       // The preload reads this to strip the service's own suffix from the
       // document title; it has to be back in place after every navigation.
       this.window.webContents.send('service:name', this.service.name);
+      // Same for the title-bar labels: they belong to the active language and
+      // must be present in every document the window loads.
+      this.window.webContents.send('veylo:titlebar-labels', i18n.titlebarLabels());
     });
 
     // The preload has registered its listeners by the time the page finishes
@@ -193,11 +197,14 @@ class MainWindow {
     // loadURL() only covers a renderer that was already listening.
     this.window.webContents.on('did-finish-load', () => {
       this.window.webContents.send('service:name', this.service.name);
+      this.window.webContents.send('veylo:titlebar-labels', i18n.titlebarLabels());
     });
     this.window.webContents.on('will-navigate', (event, url) => this.handleNavigate(event, url));
     // The service name has to reach the preload before the first paint so that
-    // readTitle() can strip the site's suffix from the document title.
+    // readTitle() can strip the site's suffix from the document title; the
+    // control labels ride along for the same reason.
     this.window.webContents.send('service:name', this.service.name);
+    this.window.webContents.send('veylo:titlebar-labels', i18n.titlebarLabels());
     this.window.webContents.on('did-fail-load', (_e, code, description, url, isMainFrame) => {
       if (!isMainFrame || code === -3) return; // -3 is a user-initiated abort
       log.warn(`Load failed (${code} ${description}) for ${url}`);

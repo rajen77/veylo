@@ -3,6 +3,7 @@
 const path = require('node:path');
 const { Menu, Tray, nativeImage } = require('electron');
 const log = require('./logger');
+const { t } = require('./i18n');
 
 const ASSETS = path.join(__dirname, '..', 'assets');
 
@@ -47,21 +48,21 @@ class TrayController {
   rebuild() {
     if (!this.tray) return;
     const template = [
-      { label: `Show Veylo (${this.getServiceName()})`, click: () => this.window.show() },
-      { label: 'Fullscreen', accelerator: 'F11', click: () => this.window.toggleFullscreen() },
+      { label: t('tray.show', { service: this.getServiceName() }), click: () => this.window.show() },
+      { label: t('tray.fullscreen'), accelerator: 'F11', click: () => this.window.toggleFullscreen() },
       { type: 'separator' },
     ];
 
     if (this.lastTitle) {
-      template.push({ label: `Now playing: ${this.lastTitle}`, enabled: false }, { type: 'separator' });
+      template.push({ label: t('tray.nowPlaying', { title: this.lastTitle }), enabled: false }, { type: 'separator' });
     }
 
     if (this.updater && this.updater.configured) {
-      template.push({ label: 'Check for updates…', click: () => this.updater.check({ interactive: true }) });
+      template.push({ label: t('tray.checkUpdates'), click: () => this.updater.check({ interactive: true }) });
       template.push({ type: 'separator' });
     }
 
-    template.push({ label: 'Quit', role: 'quit', accelerator: 'Ctrl+Q', click: () => this.onQuit() });
+    template.push({ label: t('tray.quit'), role: 'quit', accelerator: 'Ctrl+Q', click: () => this.onQuit() });
 
     this.tray.setContextMenu(Menu.buildFromTemplate(template));
   }

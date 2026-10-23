@@ -1,0 +1,102 @@
+{
+  "_meta": {
+    "code": "de",
+    "name": "Deutsch"
+  },
+  "menu": {
+    "playback": {
+      "title": "Wiedergabe",
+      "playPause": "Wiedergabe / Pause",
+      "stop": "Stoppen",
+      "next": "Nächste Folge",
+      "previous": "Vorherige Folge",
+      "forward": "10 s vorspulen",
+      "back": "10 s zurückspulen",
+      "volumeUp": "Lauter",
+      "volumeDown": "Leiser",
+      "mute": "Stummschalten"
+    },
+    "service": {
+      "title": "Streaming-Dienst",
+      "autoOpen": "Letzten Dienst beim Start öffnen"
+    },
+    "language": {
+      "title": "Sprache",
+      "auto": "Automatisch"
+    },
+    "view": {
+      "title": "Ansicht",
+      "fullscreen": "Vollbild",
+      "fullscreenAlt": "Vollbild (alternative Tastenkombination)",
+      "pip": "Bild im Bild",
+      "reload": "Neu laden",
+      "forceReload": "Erneutes Laden erzwingen",
+      "actualSize": "Tatsächliche Größe",
+      "zoomIn": "Vergrößern",
+      "zoomOut": "Verkleinern"
+    },
+    "devTools": "Entwicklerwerkzeuge umschalten",
+    "help": {
+      "title": "Hilfe",
+      "checkUpdates": "Nach Updates suchen…",
+      "diagnostics": "Diagnose kopieren",
+      "troubleshooting": "Fehlerbehebungsanleitung",
+      "about": "Über Veylo"
+    },
+    "file": {
+      "title": "Datei",
+      "quit": "Beenden"
+    },
+    "ok": "OK"
+  },
+  "dialogs": {
+    "diagnostics": {
+      "title": "Diagnose",
+      "message": "Diagnose in die Zwischenablage kopiert."
+    },
+    "about": {
+      "title": "Über",
+      "detail": "Version {version}\n\nEin inoffizielles, leichtgewichtiges Desktop-Client für Linux. Er zeigt die offiziellen Webplayer unterstützter Streaming-Dienste in einer eigenen Chromium-Umgebung mit Widevine-Unterstützung an.\n\nKeine Verbindung zu einem Streaming-Dienst oder dessen Eigentümer; keine Billigung oder Finanzierung durch diese. Disney+ und Netflix sind Marken der jeweiligen Inhaber. Für den gewählten Dienst ist ein gültiges Abonnement erforderlich."
+    },
+    "updates": {
+      "title": "Updates",
+      "notConfigured": "Kein Update-Feed konfiguriert.",
+      "notConfiguredFlatpak": "Diese Version wird als Flatpak ausgeliefert, Updates kommen daher direkt über Flatpak.\n\nAusführen: flatpak update io.github.veylo.Client",
+      "notConfiguredEnv": "Setze die Umgebungsvariable VEYLO_UPDATE_FEED auf die URL eines Release-Feeds, um Update-Prüfungen zu aktivieren.",
+      "upToDate": "Du verwendest die neueste Version ({version}).",
+      "failed": "Updates konnten nicht geprüft werden.",
+      "availableTitle": "Update verfügbar",
+      "availableMessage": "Veylo {version} ist verfügbar.",
+      "installed": "Installiert: {current}\nVerfügbar: {latest}",
+      "flatpakHint": "\n\nZum Aktualisieren in einem Terminal ausführen:\nflatpak update io.github.veylo.Client",
+      "buttons": {
+        "copyCommand": "Befehl kopieren",
+        "openRelease": "Release-Seite öffnen",
+        "later": "Später"
+      }
+    }
+  },
+  "picker": {
+    "heading": "Streaming-Dienst auswählen",
+    "subtitle": "Veylo öffnet den offiziellen Webplayer des gewählten Dienstes.",
+    "lastUsed": "Zuletzt verwendet",
+    "autoOpen": "Diesen Dienst beim Start automatisch öffnen",
+    "hint": "Jederzeit im Menü Streaming-Dienst änderbar."
+  },
+  "tray": {
+    "show": "Veylo anzeigen ({service})",
+    "fullscreen": "Vollbild",
+    "nowPlaying": "Wird abgespielt: {title}",
+    "checkUpdates": "Nach Updates suchen…",
+    "quit": "Beenden"
+  },
+  "titlebar": {
+    "menu": "Menü",
+    "fullscreen": "Vollbild",
+    "exitFullscreen": "Vollbild beenden",
+    "minimize": "Minimieren",
+    "maximize": "Maximieren",
+    "restore": "Wiederherstellen",
+    "close": "Schließen"
+  }
+}
