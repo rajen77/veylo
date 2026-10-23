@@ -3,9 +3,10 @@
 const { ipcRenderer } = require('electron');
 
 /**
- * The renderer is the official Disney+ web app, which is untrusted code as far
- * as this client is concerned. The preload therefore exposes no API to the page
- * and only forwards playback state outward through IPC.
+ * The renderer is an official streaming service's web app (Disney+, Netflix,
+ * …), which is untrusted code as far as this client is concerned. The preload
+ * therefore exposes no API to the page and only forwards playback state
+ * outward through IPC.
  *
  * Playback control in the opposite direction is done by driving the existing
  * <video> element and the player's own buttons, exactly as a user would.
@@ -43,9 +44,24 @@ function activeVideo() {
 
 function readTitle() {
   // The player renders the title in the document title while something plays,
-  // e.g. "Title | Disney+". Fall back to the heading shown in the UI.
-  const fromDocument = document.title.replace(/\s*\|\s*Disney\+\s*$/, '').trim();
-  if (fromDocument && fromDocument !== 'Disney+') return fromDocument;
+  // e.g. "Title | Disney+" or "Title on Netflix". The service name is whatever
+  // the main process reports for the active service (see src/services.js), so
+  // this stays correct when the window is pointed at another service.
+  const service = window.__veyloService || '';
+  // The suffix the site appends varies: "Title | Disney+", "Title - Netflix",
+  // "Title on Netflix". Anything left after stripping it is the real title.
+  const fromDocument = service
+    ? document.title
+      .replace(
+        new RegExp(
+          `\\s*(?:[|\\u2013\\u2014-]|\\bon)\\s*${service.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`,
+          'i',
+        ),
+        '',
+      )
+      .trim()
+    : document.title.trim();
+  if (fromDocument && fromDocument.toLowerCase() !== service.toLowerCase()) return fromDocument;
   const heading = document.querySelector('h1, [data-testid="title"]');
   return heading && heading.textContent ? heading.textContent.trim() : '';
 }
@@ -698,6 +714,12 @@ function start() {
   });
 
   ipcRenderer.on('media:request-state', push);
+
+  // The active service's display name, used by readTitle() to strip the site's
+  // own suffix from the document title. Sent before the first load.
+  ipcRenderer.on('service:name', (_event, name) => {
+    if (typeof name === 'string' && name) window.__veyloService = name;
+  });
 
   window.addEventListener('beforeunload', () => {
     if (pollTimer) window.clearInterval(pollTimer);

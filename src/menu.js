@@ -9,7 +9,17 @@ const { isDebug } = require('./logger');
  * be registered globally, which is how playback shortcuts work even while the
  * video has focus inside the page.
  */
-function buildMenu({ window, media, updater, flags }) {
+function buildMenu({
+  window,
+  media,
+  updater,
+  flags,
+  services = [],
+  activeServiceId = '',
+  autoOpen = false,
+  onSwitchService = () => {},
+  onToggleAutoOpen = () => {},
+}) {
   const send = (command) => () => media.emit(command);
   const isMac = process.platform === 'darwin';
 
@@ -34,6 +44,27 @@ function buildMenu({ window, media, updater, flags }) {
       { label: 'Volume Up', accelerator: 'Up', click: () => media.adjustVolume(0.05) },
       { label: 'Volume Down', accelerator: 'Down', click: () => media.adjustVolume(-0.05) },
       { label: 'Toggle Mute', accelerator: 'M', click: () => media.toggleMute() },
+    ],
+  });
+
+  template.push({
+    label: 'Streaming Service',
+    submenu: [
+      ...services.map((service) => ({
+        id: `service-${service.id}`,
+        label: service.name,
+        type: 'radio',
+        checked: service.id === activeServiceId,
+        click: () => onSwitchService(service.id),
+      })),
+      { type: 'separator' },
+      {
+        id: 'service-auto-open',
+        label: 'Open Last Service on Startup',
+        type: 'checkbox',
+        checked: autoOpen,
+        click: () => onToggleAutoOpen(),
+      },
     ],
   });
 
@@ -128,12 +159,13 @@ function buildMenu({ window, media, updater, flags }) {
             message: 'Veylo',
             detail:
               `Version ${app.getVersion()}\n\n` +
-              'An unofficial, lightweight desktop client for Linux. It displays the ' +
-              'official Disney+ web player in a dedicated Chromium shell with ' +
-              'Widevine support.\n\n' +
-              'Not affiliated with, endorsed by, or sponsored by The Walt Disney ' +
-              'Company. Disney+ is a trademark of Disney Enterprises, Inc. A valid ' +
-              'Disney+ subscription is required.',
+              'An unofficial, lightweight desktop client for Linux. It displays ' +
+              'the official web players of supported streaming services in a ' +
+              'dedicated Chromium shell with Widevine support.\n\n' +
+              'Not affiliated with, endorsed by, or sponsored by any streaming ' +
+              'service or its owner. Disney+ and Netflix are trademarks of their ' +
+              'respective owners. A valid subscription to the chosen service is ' +
+              'required.',
             buttons: ['OK'],
           });
         },
@@ -150,6 +182,14 @@ function buildMenu({ window, media, updater, flags }) {
 
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
+  // Keeps the checkbox items honest after a service switch, which rebuilds the
+  // window rather than the menu.
+  for (const service of services) {
+    const item = menu.getMenuItemById(`service-${service.id}`);
+    if (item) item.checked = service.id === activeServiceId;
+  }
+  const autoItem = menu.getMenuItemById('service-auto-open');
+  if (autoItem) autoItem.checked = autoOpen;
   return menu;
 }
 

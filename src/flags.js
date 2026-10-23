@@ -105,7 +105,7 @@ function hasNvidiaVaapiDriver() {
 /** Switches that are safe and beneficial on every Linux setup. */
 const commonSwitches = [
   // One renderer process per site instead of per window. The client only ever
-  // loads Disney+ and its same-origin sign-in popups, so the extra processes
+  // loads the streaming service and its same-origin sign-in popups, so the extra processes
   // Chromium spawns by default only duplicate the same V8 heap for no benefit.
   ['process-per-site', true],
 
@@ -124,7 +124,7 @@ const commonSwitches = [
   ['use-angle', 'default'],
   ['enable-accelerated-video-decode', true],
 
-  // H.264 is the codec Disney+ actually ships. Without this the bundled
+  // H.264 is the codec the streaming services actually ship. Without this the bundled
   // Chromium may refuse proprietary codecs and fall back to a black frame.
   ['enable-features', [
     'VaapiVideoDecoder',

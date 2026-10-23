@@ -37,11 +37,12 @@ linux:
     - tar.xz
   category: AudioVideo
   icon: build/icons
-  synopsis: Lightweight Disney+ desktop client
+  synopsis: Lightweight streaming desktop client
   description: >-
-    A lightweight Disney+ desktop client for Linux. Wraps the official
-    Disney+ web player in a dedicated Chromium shell with Widevine support,
-    hardware video decoding, MPRIS media controls and a tray icon.
+    A lightweight streaming desktop client for Linux. Wraps the official
+    web players of supported services (Disney+, Netflix) in a dedicated
+    Chromium shell with Widevine support, hardware video decoding, MPRIS
+    media controls and a tray icon.
   desktop:
     entry:
       Name: Veylo

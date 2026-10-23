@@ -20,8 +20,9 @@ const log = require('./logger');
  *    target: clicks landed on the page underneath regardless of the view's
  *    bounds, its stacking order, or whether it was transparent.
  *
- * Because nothing is drawn over the page, the strip cannot cover Disney+'s own
- * header either; the page is asked to leave the strip empty instead.
+ * Because nothing is drawn over the page, the strip cannot cover the streaming
+ * service's own header either; the page is asked to leave the strip empty
+ * instead.
  *
  * Only a bare channel name travels over IPC and every channel maps to a fixed
  * action, so a compromised renderer cannot reach arbitrary window APIs.

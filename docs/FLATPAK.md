@@ -103,7 +103,7 @@ Verified inside the sandbox with the resulting build:
   `SW_SECURE_DECODE`
 - A real Widevine-protected stream plays: 299 frames decoded, ~12 s of
   playback, 0 dropped frames
-- MPRIS registered, tray icon created, Disney+ loads
+- MPRIS registered, tray icon created, the selected service loads
 
 Note that `--no-sandbox` is *not* used. Disabling the whole Chromium sandbox
 would remove the renderer isolation that Widevine relies on.

@@ -17,10 +17,11 @@ function trayImage() {
 }
 
 class TrayController {
-  constructor({ window, onQuit, updater }) {
+  constructor({ window, onQuit, updater, getServiceName = () => '' }) {
     this.window = window;
     this.onQuit = onQuit;
     this.updater = updater;
+    this.getServiceName = getServiceName;
     this.tray = null;
     this.lastTitle = '';
   }
@@ -34,7 +35,7 @@ class TrayController {
       return false;
     }
 
-    this.tray.setToolTip('Veylo');
+    this.tray.setToolTip(`Veylo — ${this.getServiceName()}`);
     this.tray.on('click', () => this.window.show());
     this.tray.on('double-click', () => this.window.show());
     this.tray.on('middle-click', () => this.window.toggleFullscreen());
@@ -46,7 +47,7 @@ class TrayController {
   rebuild() {
     if (!this.tray) return;
     const template = [
-      { label: 'Show Veylo', click: () => this.window.show() },
+      { label: `Show Veylo (${this.getServiceName()})`, click: () => this.window.show() },
       { label: 'Fullscreen', accelerator: 'F11', click: () => this.window.toggleFullscreen() },
       { type: 'separator' },
     ];
@@ -70,7 +71,8 @@ class TrayController {
     const clean = title || '';
     if (clean === this.lastTitle) return;
     this.lastTitle = clean;
-    this.tray.setToolTip(clean ? `Veylo — ${clean}` : 'Veylo');
+    const service = this.getServiceName();
+    this.tray.setToolTip(clean ? `Veylo — ${service} — ${clean}` : `Veylo — ${service}`);
     this.rebuild();
   }
 

@@ -8,14 +8,16 @@
   <description>
     <p>
       A lightweight streaming desktop client for Linux. It wraps the official
-      Disney+ web player in a dedicated Chromium shell with Widevine support,
-      hardware video decoding, MPRIS media controls and a tray icon.
+      web players of supported services (Disney+, Netflix) in a dedicated
+      Chromium shell with Widevine support, hardware video decoding, MPRIS
+      media controls and a tray icon.
     </p>
     <p>
       This is an unofficial, community-built client. It is not affiliated with,
-      endorsed by, or sponsored by The Walt Disney Company. Disney+ is a
-      trademark of Disney Enterprises, Inc. A valid Disney+ subscription is
-      required, and the app simply plays the official web player.
+      endorsed by, or sponsored by any streaming service or its owner. Disney+
+      and Netflix are trademarks of their respective owners. A valid
+      subscription to the chosen service is required, and the app simply plays
+      the official web player.
     </p>
   </description>
   <launchable type="desktop-id">io.github.veylo.Client.desktop</launchable>

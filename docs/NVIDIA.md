@@ -1,6 +1,6 @@
 # NVIDIA hardware video decoding
 
-Disney+ streams DRM-protected H.264 (and increasingly HEVC). Decoding it on the
+Streaming services deliver DRM-protected H.264 (and increasingly HEVC). Decoding it on the
 CPU works, but a single 1080p stream can occupy the equivalent of a whole core,
 which defeats the point of a dedicated client. Getting the work onto the GPU
 needs three things to line up: Chromium has to accept the driver, libva has to

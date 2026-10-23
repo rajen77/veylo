@@ -7,7 +7,7 @@ const flags = require('./flags');
 const { applySwitches } = flags;
 const { shouldDisableSandbox } = require('./sandbox');
 
-const { app, components, ipcMain } = require('electron');
+const { app, components, ipcMain, Menu } = require('electron');
 const log = require('./logger');
 
 // Chromium cannot start without a usable sandbox, and a missing one kills the
@@ -42,25 +42,52 @@ const { Playback } = require('./playback');
 const { TrayController } = require('./tray');
 const { Updater } = require('./updater');
 const { buildMenu } = require('./menu');
+const { SERVICES, getService, resolveService } = require('./services');
+const prefsStore = require('./prefs');
+const { pickService, focusPicker } = require('./picker');
 
 // A second instance would create a competing MPRIS entry and a second Widevine
-// session, so hand focus back to the running one instead.
+// session, so hand focus back to the running one instead. While the service
+// chooser is up there is no player window yet, so the second launch focuses
+// that instead of starting a second chooser.
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   log.info('Another instance is already running; focusing it.');
   app.quit();
 } else {
-  app.on('second-instance', () => windowController.show());
+  // Focus the player if there is one, otherwise the startup chooser: while the
+  // chooser is up no main window exists yet.
+  app.on('second-instance', () => {
+    if (windowController.isAlive) windowController.show();
+    else focusPicker();
+  });
 }
 
 app.setName('veylo');
 app.setAppUserModelId('io.github.veylo.Client');
 
+// Which service to open, and whether to open it without asking. Read before
+// the window exists so the very first launch already knows what to show.
+let prefs = prefsStore.load();
+let activeService = resolveService(prefs.lastServiceId);
+let switching = false;
+// True while the startup chooser is the only window: closing it is the picker's
+// own decision (handled by its promise), not the user quitting the app.
+let pickerOpen = false;
+
 const windowController = new MainWindow({
+  serviceId: activeService.id,
   onStateHint: (hint) => {
     if (hint === 'reload-needed' && windowController.isAlive) {
       log.warn('Reloading the player after a renderer crash');
       windowController.window.webContents.reload();
+      return;
+    }
+    // The window is gone: leave the single-instance lock so the next launch
+    // starts a fresh chooser instead of focusing nothing.
+    if (hint === 'window-closed' && !switching) {
+      log.info('Window closed; releasing the single-instance lock');
+      app.releaseSingleInstanceLock();
     }
   },
 });
@@ -74,6 +101,8 @@ windowController.titlebar.register();
 // native window title when it actually changed, otherwise every update is an
 // X11/Wayland round trip for the same string.
 let lastWindowTitle = null;
+// The fullscreen listener is attached once per window; see syncFullscreenMenuItem().
+let fullscreenSyncedWindow = null;
 
 const playback = new Playback({
   window: windowController,
@@ -92,11 +121,68 @@ const updater = new Updater({ window: windowController.window });
 const tray = new TrayController({
   window: windowController,
   updater,
+  getServiceName: () => activeService.name,
   onQuit: () => {
     log.info('Quit requested from the tray');
     shutdown(0);
   },
 });
+
+/**
+ * Rebuilds the application menu so that the service radio buttons and the
+ * "open on startup" checkbox show the current state. Called after every change
+ * rather than only at startup, because the menu is built once.
+ */
+function rebuildMenu() {
+  buildMenu({
+    window: windowController,
+    media: playback,
+    updater,
+    flags: applied,
+    services: SERVICES,
+    activeServiceId: activeService.id,
+    autoOpen: prefs.autoOpen,
+    onSwitchService: (id) => {
+      switchService(id).catch((err) => log.error('Service switch failed:', err.message));
+    },
+    onToggleAutoOpen: () => {
+      prefs = { ...prefs, autoOpen: !prefs.autoOpen };
+      prefsStore.save(prefs);
+      log.info(`Open on startup: ${prefs.autoOpen ? 'on' : 'off'}`);
+      rebuildMenu();
+    },
+  });
+  syncFullscreenMenuItem();
+}
+
+/**
+ * Opens another service in place of the current one. The window is rebuilt
+ * rather than navigated: each service has its own session partition, and a
+ * BrowserWindow's partition is fixed when it is created.
+ */
+async function switchService(id) {
+  const next = getService(id);
+  if (!next || next.id === activeService.id) return;
+  if (switching) return;
+  switching = true;
+  try {
+    log.info(`Switching service: ${activeService.name} → ${next.name}`);
+    activeService = next;
+    prefs = { ...prefs, lastServiceId: next.id };
+    prefsStore.save(prefs);
+    windowController.destroy();
+    windowController.service = next;
+    windowController.create();
+    // The updater and the cached window title still point at the old window.
+    updater.window = windowController.window;
+    lastWindowTitle = null;
+    playback.requestRefresh();
+    tray.setNowPlaying('');
+    rebuildMenu();
+  } finally {
+    switching = false;
+  }
+}
 
 let shuttingDown = false;
 let cleanedUp = false;
@@ -110,6 +196,7 @@ let cleanedUp = false;
 function cleanup() {
   if (cleanedUp) return;
   cleanedUp = true;
+  switching = true; // the window is going away on purpose; keep the lock
   updater.stop();
   playback.stop();
   tray.destroy();
@@ -119,16 +206,24 @@ function cleanup() {
 /**
  * Keeps the View ▸ Fullscreen checkbox honest when the mode is changed from the
  * title bar button or with F11 rather than from the menu itself.
+ *
+ * The listeners are attached once per window and resolve the item through
+ * Menu.getApplicationMenu() when they fire. Rebuilding the menu (on a service
+ * switch or an option toggle) creates new item objects, so a listener bound to
+ * an old item would update a detached one, and re-attaching on every rebuild
+ * would stack listeners on a window that survived.
  */
-function syncFullscreenMenuItem(menu) {
-  const item = menu.getMenuItemById('view-fullscreen');
-  if (!item) return;
+function syncFullscreenMenuItem() {
+  const win = windowController.window;
+  if (!win || win.isDestroyed() || fullscreenSyncedWindow === win) return;
+  fullscreenSyncedWindow = win;
   const update = () => {
-    const win = windowController.window;
-    item.checked = Boolean(win && !win.isDestroyed() && win.isFullScreen());
+    const menu = Menu.getApplicationMenu();
+    const item = menu && menu.getMenuItemById('view-fullscreen');
+    if (item) item.checked = Boolean(win.isFullScreen());
   };
   for (const event of ['enter-full-screen', 'leave-full-screen']) {
-    windowController.window.on(event, update);
+    win.on(event, update);
   }
 }
 
@@ -143,6 +238,7 @@ function shutdown(code) {
 app.whenReady().then(async () => {
   log.info(`Veylo ${app.getVersion()}`);
   log.info(`Electron ${process.versions.electron}, Chromium ${process.versions.chrome}`);
+  log.info(`Service: ${activeService.name} (auto-open ${prefs.autoOpen ? 'on' : 'off'})`);
   if (process.platform !== 'linux') {
     log.warn('This client targets Linux; other platforms are untested.');
   }
@@ -160,14 +256,35 @@ app.whenReady().then(async () => {
     log.error('Playback of protected content will fail until the CDM is available.');
   }
 
+  // With "open on startup" off, ask which service to open. The chooser is its
+  // own window, so the main one is only created once the answer is in.
+  if (!prefs.autoOpen) {
+    pickerOpen = true;
+    let choice = null;
+    try {
+      choice = await pickService({ services: SERVICES, lastServiceId: activeService.id });
+    } finally {
+      pickerOpen = false;
+    }
+    // Dismissing the chooser quits the app (it is the only window, so closing
+    // it already triggered window-all-closed, which the flag above suppressed).
+    if (!choice) {
+      shutdown(0);
+      return;
+    }
+    activeService = resolveService(choice.id);
+    prefs = { ...prefs, lastServiceId: activeService.id, autoOpen: choice.autoOpen };
+    prefsStore.save(prefs);
+    windowController.service = activeService;
+  }
+
   windowController.create();
 
   // The window must exist before the menu and tray can reference it.
   updater.window = windowController.window;
   playback.start();
   tray.start();
-  const menu = buildMenu({ window: windowController, media: playback, updater, flags: applied });
-  syncFullscreenMenuItem(menu);
+  rebuildMenu();
   updater.start();
 
   if (applied.diagnostics) await flags.reportGpuStatus();
@@ -184,9 +301,10 @@ ipcMain.on('media:state', (_event, state) => {
   playback.updateState(state);
 });
 
-// The renderer should never be able to spawn windows or navigate elsewhere on
-// its own; webContents events in src/window.js arbitrate every navigation.
+// The service chooser is its own window, so it needs its own handler: the
+// global one below denies every window.open from a streaming page.
 app.on('web-contents-created', (_event, contents) => {
+  if (contents.getType() !== 'window') return;
   contents.setWindowOpenHandler(({ url }) => {
     log.debug(`Denying window.open from renderer: ${url}`);
     return { action: 'deny' };
@@ -194,6 +312,10 @@ app.on('web-contents-created', (_event, contents) => {
 });
 
 app.on('window-all-closed', () => {
+  // A service switch closes the old window before the new one exists, and the
+  // startup chooser closes itself before the player window is created; neither
+  // gap may be read as the user quitting.
+  if (switching || pickerOpen) return;
   // Closing the window is how the user quits, so this is the normal exit path
   // rather than something that only happens during a shutdown.
   log.info('All windows closed; quitting');
@@ -202,6 +324,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   shuttingDown = true;
+  switching = true; // the window is going away on purpose; keep the lock
   // The window may still exist here when the quit came from the tray or from a
   // signal, so give it a last chance to record where it was.
   windowController.persistState();

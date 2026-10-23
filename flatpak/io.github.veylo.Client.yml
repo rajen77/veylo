@@ -17,8 +17,9 @@ command: run.sh
 separate-locales: false
 
 # The app is a single-site browser: everything it displays is the official
-# Disney+ web player. No shell, no host filesystem and no host D-Bus beyond the
-# handful of names needed for media keys and the tray icon.
+# web player of the streaming service chosen at startup. No shell, no host
+# filesystem and no host D-Bus beyond the handful of names needed for media
+# keys and the tray icon.
 finish-args:
   - --share=network
   - --share=ipc

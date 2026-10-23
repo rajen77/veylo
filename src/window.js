@@ -8,12 +8,10 @@ const { MAIN_WORLD_SOURCE } = require('./codecs');
 const { applyUserAgent } = require('./user-agent');
 const { load: loadWindowState, WindowStateKeeper } = require('./window-state');
 const { TitleBar } = require('./titlebar');
-
-const START_URL = 'https://www.disneyplus.com/';
-const PARTITION = 'persist:veylo';
+const { resolveService } = require('./services');
 
 class MainWindow {
-  constructor({ onStateHint, titlebar } = {}) {
+  constructor({ onStateHint, titlebar, serviceId } = {}) {
     this.window = null;
     this.onStateHint = onStateHint || (() => {});
     this.stateKeeper = null;
@@ -24,6 +22,12 @@ class MainWindow {
       getWindow: () => this.window,
       toggleFullscreen: () => this.toggleFullscreen(),
     });
+    this.service = resolveService(serviceId);
+  }
+
+  /** The service this window is showing; the menu and tray read it. */
+  get serviceId() {
+    return this.service.id;
   }
 
   /**
@@ -61,7 +65,7 @@ class MainWindow {
     for (const event of ['maximize', 'unmaximize', 'enter-full-screen', 'leave-full-screen']) {
       this.window.on(event, push);
     }
-    // The caption follows the title Disney+ sets, which changes as things play.
+    // The caption follows the title the page sets, which changes as things play.
     this.window.on('page-title-updated', push);
     // A reload or a navigation creates a fresh document, so the strip has to be
     // told the state again once that document is ready.
@@ -69,10 +73,13 @@ class MainWindow {
   }
 
   create() {
-    // Presents the client as Chrome on Windows on every level Disney checks:
-    // request headers, client hints and the page-side navigator properties.
-    // See src/user-agent.js.
-    applyUserAgent(PARTITION);
+    const { partition } = this.service;
+
+    // Presents the client to this service as Chrome on its expected platform
+    // (see src/user-agent.js): request headers, client hints and the
+    // page-side navigator properties. Each service keeps its own partition, so
+    // the identity has to be applied to this one as well.
+    applyUserAgent(partition, this.service.identity);
 
     const restored = loadWindowState();
     this.restored = restored;
@@ -84,11 +91,11 @@ class MainWindow {
       height: restored.bounds.height,
       minWidth: 480,
       minHeight: 360,
-      title: 'Veylo',
+      title: `Veylo — ${this.service.name}`,
       // Sets _NET_WM_ICON so taskbars and docks can show the app icon even
       // when they cannot match the window to its desktop entry.
       icon: path.join(__dirname, '..', 'assets', 'icon.png'),
-      backgroundColor: '#040814',
+      backgroundColor: this.service.backgroundColor || '#040814',
       // The window controls are drawn by the client itself, so the native frame
       // is off. Edge and corner resizing still work on X11 with this build, and
       // the drag region is provided by the injected strip; only the native title
@@ -102,7 +109,7 @@ class MainWindow {
       acceptFirstMouse: true,
       webPreferences: {
         preload: path.join(__dirname, 'preload.js'),
-        partition: PARTITION,
+        partition,
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
@@ -147,6 +154,8 @@ class MainWindow {
 
     this.window.on('closed', () => {
       this.window = null;
+      this.stateKeeper = null;
+      this.onStateHint('window-closed');
     });
 
     // Closing the window quits the client. The state is flushed here rather than
@@ -166,7 +175,7 @@ class MainWindow {
 
     this.window.webContents.setWindowOpenHandler(({ url }) => this.handleWindowOpen(url));
     // The player must be told the truth about Dolby support before it picks a
-    // stream, otherwise Disney+ serves E-AC-3 and playback dies with code 83.
+    // stream, otherwise it may serve E-AC-3 and playback dies with code 83.
     // See src/codecs.js.
     this.window.webContents.on('did-start-navigation', (_event, _url, _isInPlace, isMainFrame) => {
       if (!isMainFrame) return;
@@ -174,9 +183,21 @@ class MainWindow {
         .executeJavaScript(MAIN_WORLD_SOURCE, true)
         .then(() => log.debug('Corrected codec capabilities in the page (Dolby audio reported unsupported)'))
         .catch((err) => log.debug('Codec capability patch failed:', err.message));
+      // The preload reads this to strip the service's own suffix from the
+      // document title; it has to be back in place after every navigation.
+      this.window.webContents.send('service:name', this.service.name);
     });
 
+    // The preload has registered its listeners by the time the page finishes
+    // loading, so this is the send that reliably reaches it; the one before
+    // loadURL() only covers a renderer that was already listening.
+    this.window.webContents.on('did-finish-load', () => {
+      this.window.webContents.send('service:name', this.service.name);
+    });
     this.window.webContents.on('will-navigate', (event, url) => this.handleNavigate(event, url));
+    // The service name has to reach the preload before the first paint so that
+    // readTitle() can strip the site's suffix from the document title.
+    this.window.webContents.send('service:name', this.service.name);
     this.window.webContents.on('did-fail-load', (_e, code, description, url, isMainFrame) => {
       if (!isMainFrame || code === -3) return; // -3 is a user-initiated abort
       log.warn(`Load failed (${code} ${description}) for ${url}`);
@@ -188,20 +209,22 @@ class MainWindow {
       }
     });
 
-    this.window.loadURL(START_URL);
-    log.info(`Loading ${START_URL}`);
+    this.window.loadURL(this.service.startUrl);
+    log.info(`Loading ${this.service.startUrl} (${this.service.name})`);
     return this.window;
   }
 
   handleNavigate(event, url) {
-    if (isAllowed(url)) return;
+    if (isAllowed(url, this.service)) return;
     event.preventDefault();
     log.info(`Navigation blocked inside the app: ${url}`);
-    if (isExternal(url)) shell.openExternal(url).catch((err) => log.warn('openExternal failed:', err.message));
+    if (isExternal(url, this.service)) {
+      shell.openExternal(url).catch((err) => log.warn('openExternal failed:', err.message));
+    }
   }
 
   handleWindowOpen(url) {
-    if (isAllowed(url)) {
+    if (isAllowed(url, this.service)) {
       // Sign-in and account flows use genuine popups; they inherit the same
       // hardened web preferences and stay inside the app.
       return {
@@ -212,7 +235,7 @@ class MainWindow {
           autoHideMenuBar: true,
           parent: this.window,
           webPreferences: {
-            partition: PARTITION,
+            partition: this.service.partition,
             contextIsolation: true,
             nodeIntegration: false,
             sandbox: true,
@@ -265,6 +288,8 @@ class MainWindow {
   destroy() {
     this.persistState();
     if (this.isAlive) this.window.destroy();
+    this.window = null;
+    this.stateKeeper = null;
   }
 }
-module.exports = { MainWindow, START_URL, PARTITION };
+module.exports = { MainWindow };

@@ -1,58 +1,26 @@
 'use strict';
 
 /**
- * Every navigation target is checked against this allowlist. The client renders
- * the official Disney+ web app, so it only ever needs to reach Disney's own
- * hosts plus the infrastructure that the player legitimately talks to
- * (authentication, DRM licence delivery, CDN). Opening anything else in the
- * main window is refused.
+ * Every navigation target is checked against an allowlist built from the
+ * active service (see src/services.js). The client renders an official web
+ * player, so it only ever needs to reach that service's own hosts plus the
+ * infrastructure the player legitimately talks to (authentication, DRM licence
+ * delivery, CDN). Opening anything else in the main window is refused.
+ *
+ * The lists are resolved on demand rather than captured at load time, so a
+ * service switch takes effect for the very next navigation.
  */
 
-const ALLOWED_HOST_SUFFIXES = [
-  'disneyplus.com',
-  'dssott.com', // Disney Streaming Services: auth, playback API
-  'bamgrid.com', // Disney Streaming identity platform
-  'disneystreaming.com',
-  'dtci.co',
-  'cdn.registerdisney.go.com',
-  'widevine.com', // licence proxy endpoints
-  'googleapis.com', // Widevine licence backend
-  'googlevideo.com', // media delivery
-  'google.com',
-  'gstatic.com',
-  'doubleclick.net', // required by the player's analytics stack
-  'd9.disney-plus.net',
-  'disney-plus.net',
-  'akamaihd.net',
-  'akamaized.net',
-  'llnwd.net',
-  'cloudfront.net',
-  'fastly.net',
-  'edgesuite.net',
-  'conviva.com', // playback telemetry, player refuses to start without it
-  'scorecardresearch.com',
-  'bam.nr-data.net',
-  'newrelic.com',
-  'bugsnag.com',
-];
+const { allowedHostSuffixes } = require('./services');
 
 const INTERNAL_SCHEMES = new Set(['devtools:', 'chrome:', 'chrome-extension:', 'blob:', 'data:', 'about:']);
-
-/** Hosts that may be opened in the system browser rather than inside the app. */
-const EXTERNAL_HOST_SUFFIXES = [
-  'help.disneyplus.com',
-  'disneytermsofuse.com',
-  'disneyprivacycenter.com',
-  'disney.com',
-  'd23.com',
-];
 
 function hostMatches(hostname, suffixes) {
   const host = String(hostname || '').toLowerCase();
   return suffixes.some((suffix) => host === suffix || host.endsWith(`.${suffix}`));
 }
 
-function isAllowed(url) {
+function isAllowed(url, service) {
   let parsed;
   try {
     parsed = new URL(url);
@@ -61,10 +29,10 @@ function isAllowed(url) {
   }
   if (INTERNAL_SCHEMES.has(parsed.protocol)) return true;
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false;
-  return hostMatches(parsed.hostname, ALLOWED_HOST_SUFFIXES);
+  return hostMatches(parsed.hostname, allowedHostSuffixes(service));
 }
 
-function isExternal(url) {
+function isExternal(url, service) {
   let parsed;
   try {
     parsed = new URL(url);
@@ -72,7 +40,10 @@ function isExternal(url) {
     return false;
   }
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false;
-  return hostMatches(parsed.hostname, EXTERNAL_HOST_SUFFIXES) || !isAllowed(url);
+  const external = service && service.externalHostSuffixes
+    ? hostMatches(parsed.hostname, service.externalHostSuffixes)
+    : false;
+  return external || !isAllowed(url, service);
 }
 
-module.exports = { isAllowed, isExternal, hostMatches, ALLOWED_HOST_SUFFIXES, EXTERNAL_HOST_SUFFIXES };
+module.exports = { isAllowed, isExternal, hostMatches };

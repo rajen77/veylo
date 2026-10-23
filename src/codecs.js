@@ -1,8 +1,8 @@
 'use strict';
 
 /**
- * Corrects the media codec capabilities this build reports to the Disney+ web
- * player.
+ * Corrects the media codec capabilities this build reports to the streaming
+ * services' web players.
  *
  * castLabs' Electron ships a `libffmpeg.so` that contains no AC-3 or E-AC-3
  * decoder, yet the build still answers "yes" when a page asks whether it can
@@ -15,17 +15,17 @@
  * decoders are linked into that library. Google Chrome, on the same machine and
  * with the same underlying decoders, answers `false` and `""`.
  *
- * Disney+ trusts those answers when it chooses an audio track. Because Chromium
- * claims it can handle E-AC-3, Disney+ serves an `ec-3` init segment; the audio
- * decoder then fails to initialise and the player aborts with an error the site
- * surfaces as code 83:
+ * The services trust those answers when they choose an audio track. Because
+ * Chromium claims it can handle E-AC-3, Disney+ serves an `ec-3` init segment;
+ * the audio decoder then fails to initialise and the player aborts with an
+ * error the site surfaces as code 83:
  *
  *     PipelineStatus::DECODER_ERROR_NOT_SUPPORTED: audio decoder
  *     initialization failed with DecoderStatus::Codes::kUnsupportedConfig
  *
- * Once Dolby is reported as unsupported, Disney+ falls back to AAC (`mp4a`),
- * which this build can decode, and playback proceeds. Nothing is added to or
- * removed from any media stream, and the DRM path is untouched.
+ * Once Dolby is reported as unsupported, the player falls back to AAC
+ * (`mp4a`), which this build can decode, and playback proceeds. Nothing is
+ * added to or removed from any media stream, and the DRM path is untouched.
  *
  * The patch has to execute in the page's own JavaScript world. A preload script
  * runs in an isolated world and shares no prototypes with the page, so

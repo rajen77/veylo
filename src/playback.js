@@ -67,7 +67,7 @@ class Playback {
 
   /**
    * Picture-in-picture is implemented as a compact always-on-top window rather
-   * than the browser PiP API, because the Disney+ player does not expose PiP
+   * than the browser PiP API, because the streaming services do not expose PiP
    * controls for all titles and the native route keeps the DRM session intact.
    */
   togglePinned() {

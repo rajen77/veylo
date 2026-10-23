@@ -1,23 +1,27 @@
 # Veylo
 
-A lightweight desktop client for Disney+ on Linux, built on
+A lightweight desktop client for streaming services on Linux — Disney+ and
+Netflix today — built on
 [Electron for Content Security](https://github.com/castlabs/electron-releases)
 (castLabs' Electron fork) so that protected playback works through Widevine.
 
-> **Not affiliated with Disney.** This is an unofficial client. It is not
-> endorsed by, sponsored by, or connected to Disney or The Walt Disney Company.
-> "Disney+" is a trademark of its respective owner. The client renders Disney+'s
-> own web player; it does not bypass DRM or reverse engineer any Disney service.
+> **Unofficial.** This client is not endorsed by, sponsored by, or connected to
+> Disney, Netflix, or their parent companies. "Disney+" and "Netflix" are
+> trademarks of their respective owners. The client renders each service's own
+> web player; it does not bypass DRM or reverse engineer any streaming service.
 
 ## Why a dedicated client
 
 Browsers keep a full multi-process engine, extension machinery, and history
-service alive around a single site. This client loads only `disneyplus.com`,
-which cuts the resident memory and background CPU that a browser spends on
-everything else.
+service alive around a single site. This client loads only the streaming
+service you pick, which cuts the resident memory and background CPU that a
+browser spends on everything else.
 
 ## Features
 
+- A startup chooser for the streaming service, a menu entry to switch between
+  them, and an option to open the last used one automatically
+- Each service keeps its own session, so sign-ins stay separate
 - Widevine playback through castLabs Electron (`SW_SECURE_DECODE`)
 - VA-API hardware video decoding, including the NVIDIA shim path
 - MPRIS integration, so media keys and desktop widgets control playback
@@ -111,8 +115,8 @@ npm run start:debug
 
 The window is frameless and draws its own title bar, which carries the menu,
 fullscreen, minimize, maximize and close buttons. The strip is part of the page
-rather than a native title bar, so it cannot cover Disney+'s own header; the
-page is asked to leave the strip's height empty instead.
+rather than a native title bar, so it cannot cover the service's own header;
+the page is asked to leave the strip's height empty instead.
 
 - **Fullscreen** is available from the title bar button, from View ▸ Fullscreen
   in the menu, and with <kbd>F11</kbd> or <kbd>Alt</kbd>+<kbd>Return</kbd>. In
