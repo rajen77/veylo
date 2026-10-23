@@ -70,13 +70,32 @@ function baseCode(locale) {
 
 /**
  * The language to run in: an explicit choice when it exists, otherwise the
- * system language when it exists, otherwise the base language.
+ * first locale source that names a language with a file here, otherwise the
+ * base language.
  */
 function resolve(preference, systemLocale) {
   if (preference && preference !== 'auto' && has(preference)) return preference;
-  const system = baseCode(systemLocale);
-  if (system && has(system)) return system;
+  for (const candidate of localeCandidates(systemLocale)) {
+    const code = baseCode(candidate);
+    if (code && has(code)) return code;
+  }
   return BASE;
+}
+
+/**
+ * The locale sources in POSIX order — LANGUAGE (an explicit user choice), then
+ * LC_ALL, LC_MESSAGES and LANG — followed by whatever the caller detected.
+ *
+ * The environment leads because that is what the desktop sets and it is always
+ * present: Electron's own detection can come back empty (seen under Flatpak,
+ * where app.getLocale() returns '' despite LANG=hu_HU.UTF-8), and without this
+ * chain that would fall back to English on a Hungarian system. A candidate with
+ * no matching locale file (C.UTF-8, say) simply falls through to the next.
+ */
+function localeCandidates(detected) {
+  const language = (process.env.LANGUAGE || '').split(':')[0];
+  return [language, process.env.LC_ALL, process.env.LC_MESSAGES, process.env.LANG, detected]
+    .filter(Boolean);
 }
 
 /** Switches the active language; unknown codes fall back to the base one. */

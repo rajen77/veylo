@@ -267,7 +267,9 @@ app.whenReady().then(async () => {
   // Resolved before anything is shown: the chooser, the menu and the title bar
   // all read the language while they are built.
   i18n.setLanguage(i18n.resolve(prefs.language, app.getLocale()));
-  log.info(`Language: ${i18n.language()} (preference: ${prefs.language}, system: ${app.getLocale()})`);
+  // `app.getLocale()` can be empty in a sandbox; the log then shows the POSIX
+  // locale the resolution actually fell back to (see i18n.localeCandidates).
+  log.info(`Language: ${i18n.language()} (preference: ${prefs.language}, system: ${app.getLocale() || process.env.LANGUAGE || process.env.LC_ALL || process.env.LANG || 'unknown'})`);
   if (process.platform !== 'linux') {
     log.warn('This client targets Linux; other platforms are untested.');
   }
