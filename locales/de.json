@@ -1,7 +1,8 @@
 {
   "_meta": {
     "code": "de",
-    "name": "Deutsch"
+    "name": "Deutsch",
+    "acceptLocale": "de-DE"
   },
   "menu": {
     "playback": {

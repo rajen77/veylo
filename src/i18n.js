@@ -108,6 +108,19 @@ function setLanguage(code) {
   return active;
 }
 
+/**
+ * The Accept-Language list for the active language: the full locale tag from
+ * `_meta.acceptLocale` (e.g. `hu-HU`) followed by the bare code, as an ordered
+ * list of language codes. The page-side `navigator.language` is built from the
+ * same list, so what the header claims and what the page reads agree — this is
+ * how the Language menu also steers the content the services offer.
+ */
+function acceptLanguages() {
+  const meta = (dictFor(active) || {})._meta || {};
+  const primary = String(meta.acceptLocale || active);
+  return primary === active ? [active] : [primary, active];
+}
+
 /** The active language code. */
 function language() {
   return active;
@@ -181,6 +194,7 @@ activeDict = dictFor(active);
 
 module.exports = {
   BASE,
+  acceptLanguages,
   available,
   has,
   language,

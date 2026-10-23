@@ -1,7 +1,8 @@
 {
   "_meta": {
     "code": "hu",
-    "name": "Magyar"
+    "name": "Magyar",
+    "acceptLocale": "hu-HU"
   },
   "menu": {
     "playback": {

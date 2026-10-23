@@ -2,6 +2,7 @@
 
 const { app, session } = require('electron');
 const log = require('./logger');
+const i18n = require('./i18n');
 
 /**
  * Presents the client as a current Chrome on the platform the active service
@@ -90,17 +91,23 @@ const FULL_VERSION_LIST = [
 
 /**
  * Builds the self-contained expression for `webContents.executeJavaScript`
- * that rewrites the page-side `navigator` properties for one identity. It is
- * evaluated in the page's main world before any of the site's own scripts run.
- * A preload script cannot be used here: it runs in an isolated world and its
- * changes to `navigator` are invisible to the player.
+ * that rewrites the page-side `navigator` properties for one identity and
+ * language. It is evaluated in the page's main world before any of the site's
+ * own scripts run. A preload script cannot be used here: it runs in an
+ * isolated world and its changes to `navigator` are invisible to the player.
  */
-function navigatorPatchSource(identity) {
+function navigatorPatchSource(identity, languages) {
   return `(() => {
-  // Repeated on every main-frame navigation; guard so the prototypes are not
-  // wrapped again on each one.
-  if (window.__veyloUASpoofed) return true;
+  // The guard compares identity *and* language: switching the language
+  // re-runs the patch on pages that are already open, which has to redefine
+  // the getters, while a repeated navigation with the same values must not.
+  const tag = ${JSON.stringify(`${identity.navigatorPlatform}|${languages.join(',')}`)};
+  if (window.__veyloUAPatched === tag) return true;
+  window.__veyloUAPatched = tag;
 
+  // The same ordered list the Accept-Language header carries, so what the page
+  // reads from JavaScript and what the header claims cannot disagree.
+  const languageTags = ${JSON.stringify(languages)};
   const brands = ${JSON.stringify(BRANDS)};
   const fullVersionList = ${JSON.stringify(FULL_VERSION_LIST)};
   const snapshot = { brands, mobile: false, platform: ${JSON.stringify(identity.uaDataPlatform)} };
@@ -138,15 +145,33 @@ function navigatorPatchSource(identity) {
     get: () => ${JSON.stringify(identity.navigatorPlatform)},
   });
 
-  window.__veyloUASpoofed = true;
+  // Same for the language: Chromium reports the system locale here, while the
+  // header carries the language chosen in the Language menu.
+  Object.defineProperty(Navigator.prototype, 'language', {
+    configurable: true,
+    get: () => languageTags[0],
+  });
+  Object.defineProperty(Navigator.prototype, 'languages', {
+    configurable: true,
+    get: () => languageTags.slice(),
+  });
+
   return true;
 })()`;
 }
 
 // Each service keeps its own partition (see src/services.js), so every
 // partition gets the identity of the service that owns it.
-const applied = new Map(); // partition -> { identity, session }
+const applied = new Map(); // partition -> { identity, session, userAgent }
+// Every window and popup the patch handler sees, so a language switch can also
+// update the pages that are open right now.
+const openContents = new Set();
 let navigatorPatchInstalled = false;
+
+/** The registered identity for a webContents' session, or null. */
+function entryFor(contents) {
+  return [...applied.values()].find((item) => item.session === contents.session) || null;
+}
 
 /**
  * Applies the given identity to `app`, to every request in the given
@@ -164,8 +189,10 @@ function applyUserAgent(partition, identityName) {
 
   app.userAgentFallback = userAgent;
   const ses = session.fromPartition(partition);
-  ses.setUserAgent(userAgent);
-  applied.set(partition, { identity, session: ses });
+  // setUserAgent takes the Accept-Language list as well, so the header and the
+  // navigator patch below start out on the same language (src/i18n.js).
+  ses.setUserAgent(userAgent, i18n.acceptLanguages().join(','));
+  applied.set(partition, { identity, session: ses, userAgent });
 
   // Electron does not send User-Agent Client Hints at all, so they are added
   // here to match what the claimed Chrome puts on the wire.
@@ -184,15 +211,17 @@ function applyUserAgent(partition, identityName) {
   if (!navigatorPatchInstalled) {
     navigatorPatchInstalled = true;
     app.on('web-contents-created', (_event, webContents) => {
+      openContents.add(webContents);
+      webContents.on('destroyed', () => openContents.delete(webContents));
       webContents.on('did-start-navigation', (_e, _url, _isInPlace, isMainFrame) => {
         if (!isMainFrame) return;
-        const entry = [...applied.values()].find((item) => item.session === webContents.session);
+        const entry = entryFor(webContents);
         if (!entry) {
           log.debug('No identity registered for this session; navigator untouched');
           return;
         }
         webContents
-          .executeJavaScript(navigatorPatchSource(entry.identity), true)
+          .executeJavaScript(navigatorPatchSource(entry.identity, i18n.acceptLanguages()), true)
           .then(() => log.debug('Spoofed navigator identity:', entry.identity.navigatorPlatform))
           .catch((err) => log.debug('UA data patch failed:', err.message));
       });
@@ -202,4 +231,30 @@ function applyUserAgent(partition, identityName) {
   log.debug(`User agent presented to ${partition}: ${userAgent}`);
 }
 
-module.exports = { applyUserAgent, IDENTITIES };
+/**
+ * Applies the active interface language to everything that carries it: the
+ * Accept-Language header of every session (setUserAgent takes the user agent
+ * and the language list together, so the identity stays untouched) and the
+ * navigator.language of every page that is open. Called when the language is
+ * switched at runtime; a partition created later picks the current language up
+ * in applyUserAgent().
+ */
+function applyBrowserLanguage() {
+  const languages = i18n.acceptLanguages();
+  const header = languages.join(',');
+  for (const entry of applied.values()) {
+    entry.session.setUserAgent(entry.userAgent, header);
+  }
+  for (const contents of openContents) {
+    if (contents.isDestroyed()) continue;
+    const entry = entryFor(contents);
+    if (!entry) continue;
+    contents
+      .executeJavaScript(navigatorPatchSource(entry.identity, languages), true)
+      .then(() => log.debug('Navigator language set to', header))
+      .catch((err) => log.debug('Language patch failed:', err.message));
+  }
+  log.debug(`Accept-Language set to ${header} on ${applied.size} session(s)`);
+}
+
+module.exports = { applyBrowserLanguage, applyUserAgent, IDENTITIES };

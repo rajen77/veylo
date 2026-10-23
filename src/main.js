@@ -38,6 +38,7 @@ let applied = { nvidia: false, nvidiaVaapi: false };
 applied = applySwitches();
 
 const { MainWindow } = require('./window');
+const { applyBrowserLanguage } = require('./user-agent');
 const { Playback } = require('./playback');
 const { TrayController } = require('./tray');
 const { Updater } = require('./updater');
@@ -131,12 +132,15 @@ const tray = new TrayController({
 
 /**
  * Applies the active language everywhere it can change without a restart: the
- * tray labels and the title-bar labels of every open window. The menu is
- * rebuilt by the caller (its labels are only read while it is built), and the
- * chooser exists only during startup, where it reads the language itself.
+ * browser's Accept-Language and navigator.language (so the services offer
+ * content in that language too), the tray labels, and the title-bar labels of
+ * every open window. The menu is rebuilt by the caller (its labels are only
+ * read while it is built), and the chooser exists only during startup, where it
+ * reads the language itself.
  */
 function applyLanguage() {
   i18n.setLanguage(i18n.resolve(prefs.language, app.getLocale()));
+  applyBrowserLanguage();
   tray.rebuild();
   const labels = i18n.titlebarLabels();
   for (const win of BrowserWindow.getAllWindows()) {

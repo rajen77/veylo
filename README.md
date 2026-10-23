@@ -23,7 +23,9 @@ browser spends on everything else.
   them, and an option to open the last used one automatically
 - Each service keeps its own session, so sign-ins stay separate
 - Interface in English, Hungarian and German: it follows the system language,
-  and the Language menu overrides it (see [Translations](#translations))
+  and the Language menu overrides it — for the interface and for the browser's
+  own language (`Accept-Language`, `navigator.language`), so the services offer
+  their content in that language too (see [Translations](#translations))
 - Widevine playback through castLabs Electron (`SW_SECURE_DECODE`)
 - VA-API hardware video decoding, including the NVIDIA shim path
 - MPRIS integration, so media keys and desktop widgets control playback

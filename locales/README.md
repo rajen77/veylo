@@ -25,5 +25,10 @@ text, so a partial translation is safe to ship.
 ## Notes
 
 - `_meta.code` should match the file name; it is informational.
+- `_meta.acceptLocale` (optional) is the full locale tag of the language —
+  `hu-HU`, `de-DE`, `fr-FR` and so on. It is what the browser sends as
+  `Accept-Language` and reports as `navigator.language`, which is how the
+  Language menu also steers the language the services offer their content in.
+  Without it the bare code from the file name is used.
 - The language is stored in `prefs.json` (`"language"`): `"auto"` follows the
   system locale, an explicit code pins the language.
