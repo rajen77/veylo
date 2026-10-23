@@ -12,7 +12,8 @@ files:
   - locales/**/*
   - package.json
 
-# Copies the snap launcher scripts into the packed app. See scripts/after-pack.js.
+# Unpacks the snap template (launcher scripts + runtime libs) into the packed
+# app. See scripts/after-pack.js.
 afterPack: scripts/after-pack.js
 
 # The Widevine CDM must never be bundled: ECS downloads it on first launch from
