@@ -1,4 +1,6 @@
 # Veylo
+[![veylo](https://snapcraft.io/veylo/badge.svg)](https://snapcraft.io/veylo)
+[![veylo](https://snapcraft.io/veylo/trending.svg?name=0)](https://snapcraft.io/veylo)
 
 A lightweight desktop client for streaming services on Linux — Disney+ and
 Netflix today — built on
