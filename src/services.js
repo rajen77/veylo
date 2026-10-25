@@ -96,6 +96,53 @@ const SERVICES = [
       'help.netflix.com',
     ],
   },
+  {
+    id: 'hbomax',
+    name: 'Max',
+    startUrl: 'https://www.max.com/',
+    backgroundColor: '#080814',
+    partition: 'persist:veylo-hbomax',
+    // Max plays in Chrome on Linux with Widevine and does not reject an
+    // Electron-flavoured user agent, so the real platform is kept — the same
+    // reasoning as Netflix: the Widevine CDM reports `Linux` in the licence
+    // request, and a contradicting claim risks breaking the DRM exchange.
+    identity: 'linux',
+    icon: path.join(__dirname, '..', 'assets', 'hbomax.png'),
+    allowedHostSuffixes: [
+      'max.com', // site, sign-in, account, playback and media APIs
+      'hbomax.com', // legacy brand: auth and playback endpoints
+      'discomax.com', // Max API platform (telegraph, images, playback)
+      'hbo.com', // legacy HBO links and assets
+      'azurefd.net', // Azure Front Door CDN used for stream delivery
+    ],
+    externalHostSuffixes: [
+      'help.max.com',
+      'help.hbomax.com',
+    ],
+  },
+  {
+    id: 'appletv',
+    name: 'Apple TV+',
+    startUrl: 'https://tv.apple.com/',
+    backgroundColor: '#000000',
+    partition: 'persist:veylo-appletv',
+    // Apple TV+ refuses to play on a Linux identity (the player surfaces a
+    // generic "An Error Occurred" and never starts), so the service is
+    // presented as Windows Chrome — the same approach as Disney+. Unlike
+    // Netflix, Apple does not appear to cross-check the platform the Widevine
+    // CDM reports in the licence request, so the spoof does not break DRM.
+    identity: 'windows',
+    icon: path.join(__dirname, '..', 'assets', 'appletv.png'),
+    allowedHostSuffixes: [
+      'apple.com', // site, sign-in (appleid), account, store APIs
+      'aiv-cdn.net', // Apple iTunes video: stream manifests and segments
+      'mzstatic.com', // artwork and static assets
+      'itunes.com', // legacy store endpoints still referenced by the player
+    ],
+    externalHostSuffixes: [
+      'support.apple.com',
+    ],
+  },
 ];
 
 const DEFAULT_SERVICE_ID = 'disneyplus';

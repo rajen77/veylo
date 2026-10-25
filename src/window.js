@@ -5,6 +5,7 @@ const { BrowserWindow, shell } = require('electron');
 const log = require('./logger');
 const { isAllowed, isExternal } = require('./security');
 const { MAIN_WORLD_SOURCE } = require('./codecs');
+const { MAIN_WORLD_SOURCE: EME_SOURCE } = require('./eme');
 const { applyUserAgent } = require('./user-agent');
 const i18n = require('./i18n');
 const { load: loadWindowState, WindowStateKeeper } = require('./window-state');
@@ -184,6 +185,14 @@ class MainWindow {
         .executeJavaScript(MAIN_WORLD_SOURCE, true)
         .then(() => log.debug('Corrected codec capabilities in the page (Dolby audio reported unsupported)'))
         .catch((err) => log.debug('Codec capability patch failed:', err.message));
+      // The Windows identity makes some players demand a hardware-secure
+      // Widevine path this build cannot provide; downgrade the request to
+      // software-secure before the player negotiates DRM.
+      // See src/eme.js.
+      this.window.webContents
+        .executeJavaScript(EME_SOURCE, true)
+        .then(() => log.debug('Downgraded EME robustness requests to SW secure'))
+        .catch((err) => log.debug('EME robustness patch failed:', err.message));
       // The preload reads this to strip the service's own suffix from the
       // document title; it has to be back in place after every navigation.
       this.window.webContents.send('service:name', this.service.name);

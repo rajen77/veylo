@@ -22,9 +22,10 @@ const i18n = require('./i18n');
  *
  * The platform itself is a per-service choice:
  *
- *   - Windows (`disneyplus`): the player refuses to start on a user agent that
- *     advertises Electron, and Disney+ serves lower resolutions (reports down
- *     to 480p) to clients it identifies as Linux.
+ *   - Windows (`disneyplus`, `appletv`): the player refuses to start on a user
+ *     agent that advertises Electron, and both services refuse or throttle
+ *     clients they identify as Linux (Disney+ serves lower resolutions; Apple
+ *     TV+ fails with a generic playback error).
  *   - Linux (`netflix`): Netflix compares the claimed platform against the one
  *     the Widevine CDM reports inside the licence request (`platform_name:
  *     Linux`). Claiming Windows breaks the licence exchange — playback fails
