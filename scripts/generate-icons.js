@@ -19,6 +19,9 @@ const OUT_DIR = path.join(__dirname, '..', 'assets');
 const BUILD_DIR = path.join(__dirname, '..', 'build', 'icons');
 const FLATPAK_ICON_NAME = 'io.github.veylo.Client.png';
 
+// Every icon theme size written below; also the set checked for up-to-dateness.
+const SIZES = [16, 22, 24, 32, 48, 64, 128, 256, 512];
+
 function paeth(a, b, c) {
   const p = a + b - c;
   const pa = Math.abs(p - a);
@@ -228,10 +231,38 @@ function writePng(filePath, rgba, size) {
   return filePath;
 }
 
+/** True when every generated file exists and is at least as new as the source. */
+function iconsUpToDate() {
+  const sourceMtime = fs.statSync(SOURCE).mtimeMs;
+  const outputs = [
+    path.join(OUT_DIR, 'tray.png'),
+    path.join(OUT_DIR, 'icon.png'),
+    path.join(__dirname, '..', 'flatpak', 'icons', FLATPAK_ICON_NAME),
+    ...SIZES.flatMap((size) => [
+      path.join(BUILD_DIR, `${size}.png`),
+      path.join(BUILD_DIR, `${size}x${size}`, 'veylo.png'),
+    ]),
+  ];
+  return outputs.every((file) => {
+    try {
+      return fs.statSync(file).mtimeMs >= sourceMtime;
+    } catch {
+      return false;
+    }
+  });
+}
+
 function main() {
   if (!fs.existsSync(SOURCE)) {
     console.error(`Icon source not found: ${SOURCE}`);
     process.exit(1);
+  }
+
+  // Every dist* script runs this; re-encoding all sizes at deflate level 9 is
+  // wasted work when veylo.png has not changed and the outputs are current.
+  if (iconsUpToDate()) {
+    console.log('Icons are up to date; nothing to regenerate.');
+    return;
   }
 
   const source = decodePng(fs.readFileSync(SOURCE));
@@ -247,8 +278,7 @@ function main() {
   // Icon theme sizes. electron-builder expects flat <size>.png files directly
   // inside the icons directory, while Flatpak wants <size>x<size>/<app-id>.png,
   // so both layouts are written from the same source.
-  const sizes = [16, 22, 24, 32, 48, 64, 128, 256, 512];
-  for (const size of sizes) {
+  for (const size of SIZES) {
     const dir = path.join(BUILD_DIR, `${size}x${size}`);
     fs.mkdirSync(dir, { recursive: true });
     const icon = writePng(path.join(dir, 'veylo.png'), iconAt(size), size);

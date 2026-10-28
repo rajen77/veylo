@@ -1,8 +1,9 @@
 'use strict';
 
-const { app, Menu, clipboard, dialog } = require('electron');
+const { app, Menu, clipboard, dialog, shell } = require('electron');
 const log = require('./logger');
-const { isDebug } = require('./logger');
+const { isDebug } = log;
+const { VOLUME_STEP } = require('./playback');
 const { t, available: availableLanguages } = require('./i18n');
 
 /**
@@ -44,8 +45,8 @@ function buildMenu({
       { label: t('menu.playback.forward'), accelerator: 'Right', click: () => media.emit('seek', 10_000_000) },
       { label: t('menu.playback.back'), accelerator: 'Left', click: () => media.emit('seek', -10_000_000) },
       { type: 'separator' },
-      { label: t('menu.playback.volumeUp'), accelerator: 'Up', click: () => media.adjustVolume(0.05) },
-      { label: t('menu.playback.volumeDown'), accelerator: 'Down', click: () => media.adjustVolume(-0.05) },
+      { label: t('menu.playback.volumeUp'), accelerator: 'Up', click: () => media.adjustVolume(VOLUME_STEP) },
+      { label: t('menu.playback.volumeDown'), accelerator: 'Down', click: () => media.adjustVolume(-VOLUME_STEP) },
       { label: t('menu.playback.mute'), accelerator: 'M', click: () => media.toggleMute() },
     ],
   });
@@ -181,8 +182,7 @@ function buildMenu({
         label: t('menu.help.troubleshooting'),
         click: () => {
           log.info('Opening troubleshooting guide');
-          const { shell } = require('electron');
-          shell.openExternal('https://github.com/');
+          shell.openExternal('https://github.com/rajen77/veylo#readme');
         },
       },
       { type: 'separator' },

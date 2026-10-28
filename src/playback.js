@@ -27,11 +27,6 @@ class Playback {
     this.mpris.start();
   }
 
-  /** Gracefully degrade when the desktop has no session bus. */
-  get mprisAvailable() {
-    return Boolean(this.mpris.player);
-  }
-
   updateState(state) {
     this.state = { ...this.state, ...state };
     this.mpris.update(state);

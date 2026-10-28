@@ -131,11 +131,6 @@ class MediaController {
     if (typeof state.volume === 'number') this.player.volume = state.volume;
   }
 
-  /** Called when the video pauses so the position stops advancing. */
-  notifyPaused() {
-    this.startedAt = null;
-  }
-
   stop() {
     if (!this.player) return;
     try {

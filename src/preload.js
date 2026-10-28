@@ -42,6 +42,23 @@ function activeVideo() {
   }, null);
 }
 
+// The suffix pattern depends only on the service name, and readTitle() runs on
+// every poll and title event; compiling it once per service instead of once per
+// call keeps that path free of RegExp construction.
+let titleSuffixFor = null;
+let titleSuffixPattern = null;
+
+function titleSuffixRe(service) {
+  if (titleSuffixFor !== service) {
+    titleSuffixFor = service;
+    titleSuffixPattern = new RegExp(
+      `\\s*(?:[|\\u2013\\u2014-]|\\bon)\\s*${service.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`,
+      'i',
+    );
+  }
+  return titleSuffixPattern;
+}
+
 function readTitle() {
   // The player renders the title in the document title while something plays,
   // e.g. "Title | Disney+" or "Title on Netflix". The service name is whatever
@@ -51,15 +68,7 @@ function readTitle() {
   // The suffix the site appends varies: "Title | Disney+", "Title - Netflix",
   // "Title on Netflix". Anything left after stripping it is the real title.
   const fromDocument = service
-    ? document.title
-      .replace(
-        new RegExp(
-          `\\s*(?:[|\\u2013\\u2014-]|\\bon)\\s*${service.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`,
-          'i',
-        ),
-        '',
-      )
-      .trim()
+    ? document.title.replace(titleSuffixRe(service), '').trim()
     : document.title.trim();
   if (fromDocument && fromDocument.toLowerCase() !== service.toLowerCase()) return fromDocument;
   const heading = document.querySelector('h1, [data-testid="title"]');
@@ -156,9 +165,15 @@ function attach(video) {
 
 function scan() {
   const video = activeVideo();
-  if (video) attach(video);
-  else if (currentVideo) push();
-  if (currentVideo && currentVideo.isConnected) push();
+  if (video) {
+    // attach() pushes only when the video actually changed; an unchanged video
+    // still needs the regular poll push, but not a second one right after one.
+    const changed = video !== currentVideo;
+    attach(video);
+    if (!changed) push();
+    return;
+  }
+  if (currentVideo) push();
 }
 
 /**
@@ -450,6 +465,13 @@ function createTitlebar() {
 // inline declaration that was written to shift them.
 const shiftedElements = new Map();
 
+// Elements whose computed position is fixed or sticky — the only ones the
+// shift pass can act on. Finding them walks the whole body with
+// getComputedStyle, so the list is cached and only invalidated when the DOM
+// changes (the title-bar observer below) or on the slow safety-net poll, which
+// also picks up a position the page changed through a class toggle alone.
+let offsetCandidates = null;
+
 /** Undoes every shift left behind by the previous pass. */
 function restoreShiftedElements() {
   for (const [element, shift] of shiftedElements) {
@@ -506,8 +528,18 @@ function applyTitlebarOffset() {
   const stripBottom = stripRect.top + stripRect.height;
   const viewportHeight = window.innerHeight;
 
+  if (!offsetCandidates) {
+    offsetCandidates = [];
+    for (const element of document.body.querySelectorAll('*')) {
+      if (element === strip || strip.contains(element)) continue;
+      const position = getComputedStyle(element).position;
+      if (position === 'fixed' || position === 'sticky') offsetCandidates.push(element);
+    }
+  }
+
   const candidates = [];
-  for (const element of document.body.querySelectorAll('*')) {
+  for (const element of offsetCandidates) {
+    if (!element.isConnected) continue;
     if (element === strip || strip.contains(element)) continue;
     const style = getComputedStyle(element);
     const position = style.position;
@@ -652,6 +684,8 @@ function scheduleTitlebarRebuild() {
   if (titlebarRebuildTimer) return;
   titlebarRebuildTimer = window.setTimeout(() => {
     titlebarRebuildTimer = null;
+    // The DOM changed, so the cached fixed/sticky candidates may have too.
+    offsetCandidates = null;
     buildTitlebar();
   }, 250);
 }
@@ -719,7 +753,13 @@ function startTitlebar() {
   };
   window.addEventListener('scroll', scheduleOffset, { passive: true, capture: true });
   window.addEventListener('resize', scheduleOffset, { passive: true });
-  window.setInterval(applyTitlebarOffset, OFFSET_POLL_MS);
+  // Safety net for late-loading views that pin a header without any mutation
+  // for the observer to see; it also refreshes the cached candidate list so a
+  // position changed through a class toggle alone is picked up.
+  window.setInterval(() => {
+    offsetCandidates = null;
+    applyTitlebarOffset();
+  }, OFFSET_POLL_MS);
 }
 
 function start() {

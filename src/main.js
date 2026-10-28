@@ -118,7 +118,7 @@ const playback = new Playback({
   },
 });
 
-const updater = new Updater({ window: windowController.window });
+const updater = new Updater({ getWindow: () => windowController.window });
 
 const tray = new TrayController({
   window: windowController,
@@ -202,8 +202,7 @@ async function switchService(id) {
     windowController.destroy();
     windowController.service = next;
     windowController.create();
-    // The updater and the cached window title still point at the old window.
-    updater.window = windowController.window;
+    // The cached window title still points at the old window.
     lastWindowTitle = null;
     playback.requestRefresh();
     tray.setNowPlaying('');
@@ -279,17 +278,22 @@ app.whenReady().then(async () => {
   }
 
   // The Widevine CDM is installed by the Component Updater on first launch. A
-  // window created before this resolves will fail EME negotiation, so wait.
-  try {
-    log.info('Waiting for the Widevine component to be ready…');
-    await components.whenReady();
-    const status = components.status();
-    log.info(`Widevine CDM version: ${status?.[components.WIDEVINE_CDM_ID]?.version || 'unknown'}`);
-    log.debug('Component status:', JSON.stringify(status));
-  } catch (err) {
-    log.error('Widevine component could not be prepared:', err.message);
-    log.error('Playback of protected content will fail until the CDM is available.');
-  }
+  // window created before this resolves will fail EME negotiation, so the
+  // player window waits for it below. The wait is started here rather than
+  // awaited inline so a first launch can show the service chooser while the
+  // CDM downloads instead of sitting on an empty screen.
+  const widevineReady = (async () => {
+    try {
+      log.info('Waiting for the Widevine component to be ready…');
+      await components.whenReady();
+      const status = components.status();
+      log.info(`Widevine CDM version: ${status?.[components.WIDEVINE_CDM_ID]?.version || 'unknown'}`);
+      log.debug('Component status:', JSON.stringify(status));
+    } catch (err) {
+      log.error('Widevine component could not be prepared:', err.message);
+      log.error('Playback of protected content will fail until the CDM is available.');
+    }
+  })();
 
   // With "open on startup" off, ask which service to open. The chooser is its
   // own window, so the main one is only created once the answer is in.
@@ -313,10 +317,12 @@ app.whenReady().then(async () => {
     windowController.service = activeService;
   }
 
+  // Nothing shown before this point needs the CDM, so the chooser above ran
+  // while it was being prepared; the player window must not.
+  await widevineReady;
   windowController.create();
 
   // The window must exist before the menu and tray can reference it.
-  updater.window = windowController.window;
   playback.start();
   tray.start();
   rebuildMenu();

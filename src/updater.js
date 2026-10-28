@@ -19,12 +19,25 @@ const CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
  *    Linux is the only safe way to replace a running binary.
  */
 class Updater {
-  constructor({ feedUrl, window } = {}) {
+  /**
+   * @param {object} [options]
+   * @param {string} [options.feedUrl] release feed URL; defaults to VEYLO_UPDATE_FEED
+   * @param {() => import('electron').BrowserWindow | null} [options.getWindow]
+   *   resolves the window dialogs attach to at call time. The player window is
+   *   rebuilt on every service switch, so a window captured once at
+   *   construction would go stale.
+   */
+  constructor({ feedUrl, getWindow } = {}) {
     this.feedUrl = feedUrl || process.env.VEYLO_UPDATE_FEED || '';
-    this.window = window;
+    this.getWindow = getWindow || (() => null);
     this.timer = null;
     this.interval = null;
     this.isFlatpak = fs.existsSync(FLATPAK_INFO);
+  }
+
+  /** The window the next dialog should attach to, or null before it exists. */
+  get window() {
+    return this.getWindow();
   }
 
   get configured() {

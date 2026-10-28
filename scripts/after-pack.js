@@ -35,7 +35,9 @@ const path = require('node:path');
 
 const run = promisify(execFile);
 
-// Must match SNAP_TEMPLATES.amd64 in app-builder-lib/out/targets/snap/coreLegacy.js.
+// Must match SNAP_TEMPLATES.amd64 in app-builder-lib/out/targets/snap/coreLegacy.js,
+// as installed in this exact builder version; checked in afterPack() below.
+const BUILDER_VERSION = '26.15.3';
 const TEMPLATE = {
   releaseName: 'snap-template-4.0-2',
   filenameWithExt: 'snap-template-electron-4.0-2-amd64.tar.7z',
@@ -51,6 +53,18 @@ exports.default = async function afterPack(context) {
   const names = (targets || []).map((target) => (typeof target === 'string' ? target : target.name));
   // `targets` missing → be safe and unpack; otherwise only when snap is included.
   if (Array.isArray(targets) && !names.includes('snap')) return;
+
+  // The coordinates above were copied from this exact builder version. A bump
+  // can change SNAP_TEMPLATES upstream, which would make the hook download or
+  // extract the wrong archive — fail loudly instead of doing so silently.
+  const installed = require('app-builder-lib/package.json').version;
+  if (installed !== BUILDER_VERSION) {
+    throw new Error(
+      `app-builder-lib ${installed} does not match ${BUILDER_VERSION}, the version `
+      + 'these snap template coordinates were copied from; re-check SNAP_TEMPLATES '
+      + 'in app-builder-lib/out/targets/snap/coreLegacy.js and update scripts/after-pack.js.',
+    );
+  }
 
   // The builder's own downloader: same cache, same checksum check as the snap
   // target itself, so this cannot fetch a different archive than it would.

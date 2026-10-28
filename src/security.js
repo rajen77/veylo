@@ -28,7 +28,9 @@ function isAllowed(url, service) {
     return false;
   }
   if (INTERNAL_SCHEMES.has(parsed.protocol)) return true;
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false;
+  // Every service is HTTPS-only: a plain-http target is refused outright
+  // rather than downgraded or handed to the browser.
+  if (parsed.protocol !== 'https:') return false;
   return hostMatches(parsed.hostname, allowedHostSuffixes(service));
 }
 
@@ -39,7 +41,7 @@ function isExternal(url, service) {
   } catch {
     return false;
   }
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false;
+  if (parsed.protocol !== 'https:') return false;
   const external = service && service.externalHostSuffixes
     ? hostMatches(parsed.hostname, service.externalHostSuffixes)
     : false;
