@@ -10,6 +10,7 @@ dist/
 flatpak/build/
 flatpak/repo/
 flatpak/.flatpak-builder/
+etc/
 
 # Logs
 *.log
