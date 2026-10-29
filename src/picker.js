@@ -84,7 +84,11 @@ function buildHtml({ services, lastServiceId }) {
 <meta charset="utf-8">
 <title>Veylo</title>
 <style>
-  :root { color-scheme: dark; }
+  :root {
+    color-scheme: dark;
+    --card-w: 150px;   /* fixed card size: every service tile is identical */
+    --card-gap: 14px;
+  }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   body {
@@ -95,10 +99,23 @@ function buildHtml({ services, lastServiceId }) {
   }
   h1 { margin: 0; font-size: 16px; font-weight: 600; }
   .sub { margin: 4px 0 18px; font-size: 12.5px; color: #93a3ba; }
-  .cards { display: flex; gap: 14px; flex: 1; min-height: 0; }
+  /* Fixed-width grid tracks wrap into as many rows as needed, and the
+     max-width caps a row at four cards (4 tracks + 3 gaps) however wide the
+     window gets; narrower windows simply fit fewer per row. Rows and columns
+     are centred so a partially filled last row stays balanced. The 'safe'
+     keyword keeps the content reachable when the window is shrunk below one
+     full screen. */
+  .cards {
+    display: grid; gap: var(--card-gap); flex: 1; min-height: 0;
+    grid-template-columns: repeat(auto-fill, var(--card-w));
+    justify-content: center; align-content: safe center;
+    margin: 0 auto; width: 100%; overflow: auto;
+    max-width: calc(4 * var(--card-w) + 3 * var(--card-gap));
+  }
   .card {
     -webkit-app-region: no-drag;
-    flex: 1; display: flex; flex-direction: column; align-items: center;
+    width: var(--card-w);
+    display: flex; flex-direction: column; align-items: center;
     justify-content: center; gap: 10px; padding: 16px 10px; cursor: pointer;
     background: #131c2e; border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 14px; color: inherit; font: inherit;
@@ -166,14 +183,20 @@ function pickService({ services, lastServiceId }) {
   const html = buildHtml({ services, lastServiceId });
 
   return new Promise((resolve) => {
+    // Sized for four cards across and two rows down (the current five
+    // services); the page itself wraps into more rows as services are added,
+    // so the window only needs to be big enough to show the common case and
+    // can be resized by the user from there.
     const win = new BrowserWindow({
-      width: 500,
-      height: 330,
+      width: 700,
+      height: 480,
+      minWidth: 420,
+      minHeight: 440,
       title: 'Veylo',
       icon: path.join(__dirname, '..', 'assets', 'icon.png'),
       backgroundColor: '#0b1220',
       frame: false,
-      resizable: false,
+      resizable: true,
       maximizable: false,
       minimizable: false,
       fullscreenable: false,

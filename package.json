@@ -1,6 +1,6 @@
 {
   "name": "veylo",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Lightweight streaming desktop client for Linux (Disney+, Netflix), built on Electron for Content Security (Widevine).",
   "license": "MIT",
   "private": true,

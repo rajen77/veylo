@@ -143,6 +143,56 @@ const SERVICES = [
       'support.apple.com',
     ],
   },
+  {
+    id: 'primevideo',
+    name: 'Prime Video',
+    startUrl: 'https://www.primevideo.com/',
+    backgroundColor: '#0f171e',
+    partition: 'persist:veylo-primevideo',
+    // Prime Video's player runs in a regular browser on Linux, so the real
+    // platform is kept — the same reasoning as Netflix and Max: the Widevine
+    // CDM reports `Linux` in the licence request, and a contradicting claim
+    // risks breaking the DRM exchange.
+    identity: 'linux',
+    icon: path.join(__dirname, '..', 'assets', 'primevideo.png'),
+    allowedHostSuffixes: [
+      'primevideo.com', // site, sign-in, account, playback and media APIs
+      'amazonvideo.com', // legacy brand endpoints still referenced by the player
+      // Sign-in and account live on the regional amazon domains: the site
+      // redirects to amazon.<tld>/ap/signin for the caller's region, so the
+      // region set has to be covered as well as the main domains.
+      'amazon.com',
+      'amazon.co.uk',
+      'amazon.de',
+      'amazon.fr',
+      'amazon.it',
+      'amazon.es',
+      'amazon.nl',
+      'amazon.se',
+      'amazon.pl',
+      'amazon.com.br',
+      'amazon.ca',
+      'amazon.com.mx',
+      'amazon.com.au',
+      'amazon.co.jp',
+      'amazon.in',
+      'amazon.sg',
+      'amazon.ae',
+      'amazon.sa',
+      'amazon.com.tr',
+      'amazon.eg',
+      'pv-cdn.net', // stream manifests and segments
+      'aiv-cdn.net', // Amazon video CDN: manifests and segments
+      'aiv-delivery.net', // stream delivery
+      'media-amazon.com', // images and static assets
+      'ssl-images-amazon.com', // legacy image CDN
+      'a2z.com', // playback service endpoints (video.a2z.com)
+      'doubleclick.net', // required by the player's analytics stack
+    ],
+    // No externalHostSuffixes: the player's links (help, account, terms of
+    // use) are all on primevideo.com or amazon.*, which are already allowed
+    // above, so nothing needs to open in the system browser.
+  },
 ];
 
 const DEFAULT_SERVICE_ID = 'disneyplus';
