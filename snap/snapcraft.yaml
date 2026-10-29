@@ -28,6 +28,8 @@ parts:
       - node/20/stable
     build-packages:
       - squashfs-tools # unsquashfs, to unpack electron-builder's output
+    build-environment:
+      - ELECTRON_GET_USE_PROXY: "true"
     override-build: |
       set -eu
       cd "$CRAFT_PART_SRC"
