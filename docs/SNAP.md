@@ -32,6 +32,55 @@ root, which is exactly where `command.sh` and the dynamic linker look for these
 files. The hook only runs when a snap is among the build targets, so the native
 packages stay clean.
 
+## Architectures
+
+| Architecture | Package | How |
+| --- | --- | --- |
+| amd64 | `dist/veylo_<version>_amd64.snap` | `npm run dist:snap` |
+| arm64 | `dist/snap/veylo_<version>_arm64.snap` | `scripts/build-snap-arm64.sh` |
+| armhf, riscv64, ppc64el, s390x | — | not possible, see below |
+
+The remaining architectures cannot be built *at all*:
+
+- **castLabs Electron** — the Widevine build this client is based on — ships
+  only `linux-x64` and `linux-arm64` binaries. `scripts/postinstall.js`
+  downloads the platform binary without a fallback, so `npm ci` fails outright
+  on every other architecture; and stock Electron, which does ship some of
+  them, has no Widevine, so DRM playback would not work anyway.
+- The `gnome-3-28-1804` content snap the package plugs for its GTK runtime is
+  published for `amd64`, `arm64`, `armhf` and `i386` only, so `riscv64`,
+  `ppc64el` and `s390x` would have no runtime to run against even if the
+  application could be built.
+
+## Building the arm64 snap locally
+
+electron-builder packs from its prebuilt template only for `amd64` (and
+`armhf`); for `arm64` it shells out to `snapcraft`, which needs a build
+provider (LXD or multipass). The script instead does the same job with plain
+`mksquashfs` — no root, no snapcraft, no build provider:
+
+```bash
+npm run dist:snap            # amd64 first: it seeds every arch-independent file
+scripts/build-snap-arm64.sh
+# → dist/snap/veylo_<version>_arm64.snap  (and dist/snap/…_amd64.snap copied alongside)
+```
+
+The script downloads the castLabs `linux-arm64` Electron (postinstall only
+fetches the host architecture), packs the app with
+`electron-builder --dir --arm64`, copies the launcher scripts, desktop entry,
+icon and `snap.yaml` byte-for-byte from the amd64 snap — changing only
+`architectures` and the library triplet (`x86_64-linux-gnu` →
+`aarch64-linux-gnu`) — fills the template's runtime libraries with their
+Ubuntu 20.04 arm64 builds from `ports.ubuntu.com` (focal, the same release as
+the `core20` base), and packs with electron-builder's exact `mksquashfs`
+flags. It verifies the result (aarch64 binary, `arm64` declared, root-owned
+image) before printing the upload command.
+
+One module is intentionally dropped: `abstract-socket` ships an x86_64 binary
+and has no arm64 build in the dependency tree. It is loaded exclusively for
+`unix:abstract=` D-Bus addresses, which the strictly confined snap cannot use
+anyway (no `dbus` plug — see the confinement notes below).
+
 ## Testing locally
 
 ```bash
@@ -52,6 +101,9 @@ like in every other packaging of the client.
    choose another and set it in `package.json` (`name` drives the snap name).
 3. Upload: `snapcraft upload --release=stable dist/veylo_<version>_amd64.snap`.
    `snapcraft` itself installs with `sudo snap install snapcraft --classic`.
+   For each additional architecture, upload its package the same way —
+   `dist/snap/` holds the complete upload batch (`veylo_<version>_amd64.snap`
+   and `veylo_<version>_arm64.snap`).
 
 The first upload of a new name may wait in manual review for a few days.
 Afterwards the releases appear in Ubuntu Software.

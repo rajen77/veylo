@@ -3,13 +3,14 @@
 [![veylo](https://snapcraft.io/veylo/trending.svg?name=0)](https://snapcraft.io/veylo)
 
 A lightweight desktop client for streaming services on Linux — Disney+,
-Netflix, Max, Apple TV+ and Prime Video — built on
+Netflix, Max, Apple TV+, Prime Video, SkyShowtime and Crunchyroll — built on
 [Electron for Content Security](https://github.com/castlabs/electron-releases)
 (castLabs' Electron fork) so that protected playback works through Widevine.
 
 > **Unofficial.** This client is not endorsed by, sponsored by, or connected to
 > Disney, Netflix, Warner Bros. Discovery, Apple, Amazon, or their parent
-> companies. "Disney+", "Netflix", "Max", "Apple TV+" and "Prime Video" are
+> companies. "Disney+", "Netflix", "Max", "Apple TV+", "Prime Video",
+> "SkyShowtime" and "Crunchyroll" are
 > trademarks of their respective owners. The client renders each service's
 > own web player; it does not bypass DRM or reverse engineer any streaming
 > service.
@@ -50,6 +51,8 @@ browser spends on everything else.
 | Max (HBO) | Linux Chrome | Plays on Linux as-is |
 | Apple TV+ | Windows Chrome | Refuses to play on a Linux identity; hardware-secure Widevine requests are downgraded to software-secure (see `src/eme.js`) |
 | Prime Video | Linux Chrome | Plays on Linux as-is; sign-in happens on the regional `amazon.*` domains, which the allowlist covers |
+| SkyShowtime | Linux Chrome | Plays on Linux as-is |
+| Crunchyroll | Linux Chrome | Plays on Linux as-is |
 
 Each service keeps its own session partition, so sign-ins never mix. The
 per-service platform identity is documented in `src/services.js` and

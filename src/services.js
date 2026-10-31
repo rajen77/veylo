@@ -13,7 +13,7 @@ const path = require('node:path');
  * the window all read the rest.
  *
  * Adding a service is a matter of adding an entry — its icon is expected at
- * `assets/<id>.png`.
+ * `assets/<id>.jpg`.
  */
 
 // Hosts every service legitimately needs: DRM licence delivery and the CDN
@@ -44,7 +44,7 @@ const SERVICES = [
     // Disney+ drops Linux clients to low resolutions and refuses to start on an
     // Electron user agent, so this service is presented as Windows Chrome.
     identity: 'windows',
-    icon: path.join(__dirname, '..', 'assets', 'disneyplus.png'),
+    icon: path.join(__dirname, '..', 'assets', 'disneyplus.jpg'),
     allowedHostSuffixes: [
       'disneyplus.com',
       'dssott.com', // Disney Streaming Services: auth, playback API
@@ -81,7 +81,7 @@ const SERVICES = [
     // M7111-1957-205064 when a title is resumed), so this service keeps the
     // real platform and only drops the Electron token from the user agent.
     identity: 'linux',
-    icon: path.join(__dirname, '..', 'assets', 'netflix.png'),
+    icon: path.join(__dirname, '..', 'assets', 'netflix.jpg'),
     allowedHostSuffixes: [
       'netflix.com', // site, sign-in, account
       'nflxvideo.net', // media delivery and DRM licences
@@ -107,7 +107,7 @@ const SERVICES = [
     // reasoning as Netflix: the Widevine CDM reports `Linux` in the licence
     // request, and a contradicting claim risks breaking the DRM exchange.
     identity: 'linux',
-    icon: path.join(__dirname, '..', 'assets', 'hbomax.png'),
+    icon: path.join(__dirname, '..', 'assets', 'hbomax.jpg'),
     allowedHostSuffixes: [
       'max.com', // site, sign-in, account, playback and media APIs
       'hbomax.com', // legacy brand: auth and playback endpoints
@@ -132,7 +132,7 @@ const SERVICES = [
     // Netflix, Apple does not appear to cross-check the platform the Widevine
     // CDM reports in the licence request, so the spoof does not break DRM.
     identity: 'windows',
-    icon: path.join(__dirname, '..', 'assets', 'appletv.png'),
+    icon: path.join(__dirname, '..', 'assets', 'appletv.jpg'),
     allowedHostSuffixes: [
       'apple.com', // site, sign-in (appleid), account, store APIs
       'aiv-cdn.net', // Apple iTunes video: stream manifests and segments
@@ -154,7 +154,7 @@ const SERVICES = [
     // CDM reports `Linux` in the licence request, and a contradicting claim
     // risks breaking the DRM exchange.
     identity: 'linux',
-    icon: path.join(__dirname, '..', 'assets', 'primevideo.png'),
+    icon: path.join(__dirname, '..', 'assets', 'primevideo.jpg'),
     allowedHostSuffixes: [
       'primevideo.com', // site, sign-in, account, playback and media APIs
       'amazonvideo.com', // legacy brand endpoints still referenced by the player
@@ -192,6 +192,46 @@ const SERVICES = [
     // No externalHostSuffixes: the player's links (help, account, terms of
     // use) are all on primevideo.com or amazon.*, which are already allowed
     // above, so nothing needs to open in the system browser.
+  },
+  {
+    id: 'skyshowtime',
+    name: 'SkyShowtime',
+    startUrl: 'https://www.skyshowtime.com/',
+    backgroundColor: '#0b1220',
+    partition: 'persist:veylo-skyshowtime',
+    // SkyShowtime's web player runs in a regular browser on Linux, so the real
+    // platform is kept — the same reasoning as Netflix, Max and Prime Video:
+    // the Widevine CDM reports `Linux` in the licence request, and a
+    // contradicting claim risks breaking the DRM exchange.
+    identity: 'linux',
+    // Note: the asset file name is spelled `skyshotime` (missing an 'o').
+    icon: path.join(__dirname, '..', 'assets', 'skyshotime.jpg'),
+    allowedHostSuffixes: [
+      'skyshowtime.com', // site, sign-in (auth.*), account, playback APIs (sas.skyshowtime.com)
+      'skyshowtime.net', // service endpoints referenced by the player
+    ],
+    // No externalHostSuffixes: help/FAQ links live on skyshowtime.com itself,
+    // which is already allowed above.
+  },
+  {
+    id: 'crunchyroll',
+    name: 'Crunchyroll',
+    startUrl: 'https://www.crunchyroll.com/',
+    backgroundColor: '#1f1f1f',
+    partition: 'persist:veylo-crunchyroll',
+    // Crunchyroll's web player runs in a regular browser on Linux, so the real
+    // platform is kept — the same reasoning as Netflix, Max, Prime Video and
+    // SkyShowtime: the Widevine CDM reports `Linux` in the licence request, and
+    // a contradicting claim risks breaking the DRM exchange.
+    identity: 'linux',
+    icon: path.join(__dirname, '..', 'assets', 'crunchyroll.jpg'),
+    allowedHostSuffixes: [
+      'crunchyroll.com', // site, sign-in, account, playback and media APIs
+      'crunchyroll.net', // static assets and media delivery
+      'crunchyroll.tv', // short links referenced by the player
+    ],
+    // No externalHostSuffixes: help links live on help.crunchyroll.com, which
+    // the `crunchyroll.com` suffix above already covers.
   },
 ];
 
