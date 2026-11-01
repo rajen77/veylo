@@ -211,6 +211,9 @@ function buildMenu({
 
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
+  // A window created before this menu may keep the previous one on Linux;
+  // set it explicitly so the radio state matches the active service.
+  if (window && window.window && !window.window.isDestroyed()) window.window.setMenu(menu);
   if (isDebug) {
     // Two levels deep: enough to see the whole interface at a glance when
     // checking a translation or a rebuild.

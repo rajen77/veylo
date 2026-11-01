@@ -214,6 +214,11 @@ async function switchService(id) {
     playback.requestRefresh();
     tray.setNowPlaying('');
     rebuildMenu();
+    // The click that triggered the switch is still being processed by the
+    // native menu, which applies its own radio toggle once the handler returns
+    // and can leave the clicked entry shown instead of the active one. Rebuild
+    // again after it has finished.
+    setImmediate(rebuildMenu);
   } finally {
     switching = false;
   }
