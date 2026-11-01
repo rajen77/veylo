@@ -224,12 +224,8 @@ function buildMenu({
       : []));
     log.debug(`Menu (${labels.length} items):`, labels.join(' | '));
   }
-  // Keeps the checkbox items honest after a service switch, which rebuilds the
-  // window rather than the menu.
-  for (const service of services) {
-    const item = menu.getMenuItemById(`service-${service.id}`);
-    if (item) item.checked = service.id === activeServiceId;
-  }
+  // The radio state comes from the template alone: assigning `checked` to a
+  // radio item afterwards re-selects the last entry of the group.
   const autoItem = menu.getMenuItemById('service-auto-open');
   if (autoItem) autoItem.checked = autoOpen;
   return menu;
