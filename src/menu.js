@@ -54,11 +54,12 @@ function buildMenu({
   template.push({
     label: t('menu.service.title'),
     submenu: [
-      ...services.map((service) => ({
+      ...services.map((service, index) => ({
         id: `service-${service.id}`,
         label: service.name,
         type: 'radio',
         checked: service.id === activeServiceId,
+        ...(index < 9 ? { accelerator: `CommandOrControl+${index + 1}` } : {}),
         click: () => onSwitchService(service.id),
       })),
       { type: 'separator' },

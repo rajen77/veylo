@@ -59,12 +59,13 @@ describe('Updater.check', () => {
     else process.env.VEYLO_UPDATE_FEED = savedFeed;
   });
 
-  it('reports not-configured without a feed', async () => {
+  it('falls back to the GitHub releases feed without an override', () => {
     const saved = process.env.VEYLO_UPDATE_FEED;
     delete process.env.VEYLO_UPDATE_FEED;
     try {
-      const result = await new Updater().check();
-      assert.equal(result.status, 'not-configured');
+      const fallback = new Updater();
+      assert.equal(fallback.configured, true);
+      assert.match(fallback.feedUrl, /api\.github\.com\/repos\/rajen77\/veylo\/releases\/latest/);
     } finally {
       process.env.VEYLO_UPDATE_FEED = saved;
     }

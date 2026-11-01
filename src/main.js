@@ -46,6 +46,7 @@ const { buildMenu } = require('./menu');
 const { SERVICES, getService, resolveService } = require('./services');
 const prefsStore = require('./prefs');
 const { pickService, focusPicker } = require('./picker');
+const { serviceFromArgv } = require('./cli');
 const i18n = require('./i18n');
 
 // A second instance would create a competing MPRIS entry and a second Widevine
@@ -59,7 +60,11 @@ if (!gotLock) {
 } else {
   // Focus the player if there is one, otherwise the startup chooser: while the
   // chooser is up no main window exists yet.
-  app.on('second-instance', () => {
+  app.on('second-instance', (_event, argv) => {
+    const requested = serviceFromArgv(argv);
+    if (requested && windowController.isAlive) {
+      switchService(requested.id).catch((err) => log.error('Service switch failed:', err.message));
+    }
     if (windowController.isAlive) windowController.show();
     else focusPicker();
   });
@@ -71,7 +76,9 @@ app.setAppUserModelId('io.github.veylo.Client');
 // Which service to open, and whether to open it without asking. Read before
 // the window exists so the very first launch already knows what to show.
 let prefs = prefsStore.load();
-let activeService = resolveService(prefs.lastServiceId);
+// `--service=<id>` opens that service directly, skipping the chooser.
+const cliService = serviceFromArgv(process.argv.slice(1));
+let activeService = cliService || resolveService(prefs.lastServiceId);
 let switching = false;
 // True while the startup chooser is the only window: closing it is the picker's
 // own decision (handled by its promise), not the user quitting the app.
@@ -297,7 +304,7 @@ app.whenReady().then(async () => {
 
   // With "open on startup" off, ask which service to open. The chooser is its
   // own window, so the main one is only created once the answer is in.
-  if (!prefs.autoOpen) {
+  if (!prefs.autoOpen && !cliService) {
     pickerOpen = true;
     let choice = null;
     try {

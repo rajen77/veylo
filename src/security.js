@@ -48,4 +48,23 @@ function isExternal(url, service) {
   return external || !isAllowed(url, service);
 }
 
-module.exports = { isAllowed, isExternal, hostMatches };
+// Everything a streaming player legitimately asks for: fullscreen, the EME
+// identifier Widevine needs, and sanitized clipboard writes. Camera,
+// microphone, geolocation, notifications and the rest are refused.
+const ALLOWED_PERMISSIONS = new Set([
+  'fullscreen',
+  'protected-media-identifier',
+  'clipboard-sanitized-write',
+]);
+
+function isPermissionAllowed(permission) {
+  return ALLOWED_PERMISSIONS.has(permission);
+}
+
+/** Installs the deny-by-default permission policy on a session. */
+function applyPermissionPolicy(session) {
+  session.setPermissionRequestHandler((_contents, permission, callback) => callback(isPermissionAllowed(permission)));
+  session.setPermissionCheckHandler((_contents, permission) => isPermissionAllowed(permission));
+}
+
+module.exports = { isAllowed, isExternal, hostMatches, isPermissionAllowed, applyPermissionPolicy };

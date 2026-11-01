@@ -8,7 +8,7 @@
   <description>
     <p>
       A lightweight streaming desktop client for Linux. It wraps the official
-      web players of supported services (Disney+, Netflix) in a dedicated
+      web players of supported services (Disney+, Netflix, Max, Apple TV+, Prime Video, SkyShowtime, Crunchyroll) in a dedicated
       Chromium shell with Widevine support, hardware video decoding, MPRIS
       media controls and a tray icon.
     </p>
@@ -28,7 +28,15 @@
     <category>Player</category>
   </categories>
   <releases>
-    <release version="0.5.0" date="2026-10-31"/>
+    <release version="0.5.0" date="2026-10-31">
+      <description>
+        <ul>
+          <li>New services: SkyShowtime and Crunchyroll</li>
+          <li>Smaller package: provider icons are now JPEG</li>
+          <li>The launch window sizes itself to the number of services</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.4.0" date="2026-10-29"/>
     <release version="0.3.1" date="2026-10-28"/>
     <release version="0.3.0" date="2026-10-25"/>

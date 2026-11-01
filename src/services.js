@@ -204,8 +204,7 @@ const SERVICES = [
     // the Widevine CDM reports `Linux` in the licence request, and a
     // contradicting claim risks breaking the DRM exchange.
     identity: 'linux',
-    // Note: the asset file name is spelled `skyshotime` (missing an 'o').
-    icon: path.join(__dirname, '..', 'assets', 'skyshotime.jpg'),
+    icon: path.join(__dirname, '..', 'assets', 'skyshowtime.jpg'),
     allowedHostSuffixes: [
       'skyshowtime.com', // site, sign-in (auth.*), account, playback APIs (sas.skyshowtime.com)
       'skyshowtime.net', // service endpoints referenced by the player

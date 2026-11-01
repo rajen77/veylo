@@ -1,9 +1,9 @@
 'use strict';
 
 const path = require('node:path');
-const { BrowserWindow, shell } = require('electron');
+const { BrowserWindow, session, shell } = require('electron');
 const log = require('./logger');
-const { isAllowed, isExternal } = require('./security');
+const { isAllowed, isExternal, applyPermissionPolicy } = require('./security');
 const { MAIN_WORLD_SOURCE } = require('./codecs');
 const { MAIN_WORLD_SOURCE: EME_SOURCE } = require('./eme');
 const { applyUserAgent } = require('./user-agent');
@@ -82,6 +82,7 @@ class MainWindow {
     // page-side navigator properties. Each service keeps its own partition, so
     // the identity has to be applied to this one as well.
     applyUserAgent(partition, this.service.identity);
+    applyPermissionPolicy(session.fromPartition(partition));
 
     const restored = loadWindowState();
     this.restored = restored;
@@ -209,6 +210,12 @@ class MainWindow {
       this.window.webContents.send('veylo:titlebar-labels', i18n.titlebarLabels());
     });
     this.window.webContents.on('will-navigate', (event, url) => this.handleNavigate(event, url));
+    // A sign-in popup is allowed by its first URL only; later navigations
+    // inside it go through the same allowlist as the main window.
+    this.window.webContents.on('did-create-window', (child) => {
+      child.webContents.on('will-navigate', (event, url) => this.handleNavigate(event, url));
+      child.webContents.on('will-redirect', (event, url) => this.handleNavigate(event, url));
+    });
     // The service name has to reach the preload before the first paint so that
     // readTitle() can strip the site's suffix from the document title; the
     // control labels ride along for the same reason.

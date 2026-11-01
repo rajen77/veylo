@@ -32,7 +32,7 @@ electronDist: node_modules/electron/dist
 # on purpose, because a customised plug list makes electron-builder drop its
 # template path and shell out to the snapcraft CLI (which is not installed).
 snap:
-  summary: Lightweight streaming desktop client for Linux (Disney+, Netflix)
+  summary: Lightweight streaming desktop client for Linux
 
 linux:
   target:
@@ -54,7 +54,7 @@ linux:
   synopsis: Lightweight streaming desktop client
   description: >-
     A lightweight streaming desktop client for Linux. Wraps the official
-    web players of supported services (Disney+, Netflix) in a dedicated
+    web players of supported services (Disney+, Netflix, Max, Apple TV+, Prime Video, SkyShowtime, Crunchyroll) in a dedicated
     Chromium shell with Widevine support, hardware video decoding, MPRIS
     media controls and a tray icon.
   desktop:

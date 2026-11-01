@@ -40,7 +40,7 @@ browser spends on everything else.
 - Window state is remembered: windowed, maximized or fullscreen, the position
   and size, and which monitor it was on
 - Single-instance lock, so a second launch focuses the running window
-- Flatpak packaging and an auto-updater
+- Flatpak packaging and an update check against the GitHub releases (override with `VEYLO_UPDATE_FEED`)
 
 ## Supported services
 
@@ -53,6 +53,13 @@ browser spends on everything else.
 | Prime Video | Linux Chrome | Plays on Linux as-is; sign-in happens on the regional `amazon.*` domains, which the allowlist covers |
 | SkyShowtime | Linux Chrome | Plays on Linux as-is |
 | Crunchyroll | Linux Chrome | Plays on Linux as-is |
+
+Switch services with `Ctrl+1`…`Ctrl+9` (the order of the table above), or
+launch one directly, skipping the chooser:
+
+```bash
+veylo --service=netflix
+```
 
 Each service keeps its own session partition, so sign-ins never mix. The
 per-service platform identity is documented in `src/services.js` and

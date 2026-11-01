@@ -5,6 +5,7 @@ const { app, dialog, shell } = require('electron');
 const log = require('./logger');
 const { t } = require('./i18n');
 
+const DEFAULT_FEED_URL = 'https://api.github.com/repos/rajen77/veylo/releases/latest';
 const FLATPAK_INFO = '/.flatpak-info';
 const CHECK_DELAY_MS = 20_000;
 const CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
@@ -21,14 +22,14 @@ const CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
 class Updater {
   /**
    * @param {object} [options]
-   * @param {string} [options.feedUrl] release feed URL; defaults to VEYLO_UPDATE_FEED
+   * @param {string} [options.feedUrl] release feed URL; defaults to VEYLO_UPDATE_FEED, then the GitHub releases feed
    * @param {() => import('electron').BrowserWindow | null} [options.getWindow]
    *   resolves the window dialogs attach to at call time. The player window is
    *   rebuilt on every service switch, so a window captured once at
    *   construction would go stale.
    */
   constructor({ feedUrl, getWindow } = {}) {
-    this.feedUrl = feedUrl || process.env.VEYLO_UPDATE_FEED || '';
+    this.feedUrl = feedUrl || process.env.VEYLO_UPDATE_FEED || DEFAULT_FEED_URL;
     this.getWindow = getWindow || (() => null);
     this.timer = null;
     this.interval = null;

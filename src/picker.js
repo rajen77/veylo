@@ -5,6 +5,7 @@ const path = require('node:path');
 const { app, BrowserWindow, ipcMain, nativeImage, screen } = require('electron');
 const log = require('./logger');
 const { t, language } = require('./i18n');
+const { computeLayout } = require('./picker-layout');
 
 /**
  * The startup chooser: a small frameless window that asks which streaming
@@ -162,21 +163,7 @@ async function fitToContent(win) {
   if (!constants || win.isDestroyed()) return;
   const { workArea } = screen.getDisplayMatching(win.getBounds());
 
-  // A row holds as many cards as the grid's max-width allows (four by
-  // design), as fit on the display, and as there are services.
-  const capCols = Number.isFinite(constants.cap)
-    ? Math.floor((constants.cap + constants.gap) / (constants.cardW + constants.gap))
-    : Infinity;
-  const colsFit = Math.max(1, Math.floor(
-    (workArea.width - constants.padL - constants.padR + constants.gap) /
-      (constants.cardW + constants.gap),
-  ));
-  const cols = Math.max(1, Math.min(constants.cardCount, capCols, colsFit));
-  const neededWidth = Math.ceil(
-    constants.padL + cols * constants.cardW + (cols - 1) * constants.gap + constants.padR,
-  );
-  // BrowserWindow's minWidth/minHeight (420x440) also clamp from below.
-  const width = Math.min(Math.max(neededWidth, 420), workArea.width);
+  const { width } = computeLayout(constants, workArea);
 
   // Apply the width, correcting for the window manager's inflation of the
   // previous request. Extra room within the work area is fine — only a width
@@ -372,7 +359,20 @@ function buildHtml({ services, lastServiceId }) {
       var preferred = document.querySelector('.card.last') || cards[0];
       if (preferred) preferred.focus();
       document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape') api.cancel();
+        if (event.key === 'Escape') { api.cancel(); return; }
+        var list = Array.prototype.slice.call(cards);
+        var at = list.indexOf(document.activeElement);
+        if (/^[1-9]$/.test(event.key)) {
+          var byNumber = list[Number(event.key) - 1];
+          if (byNumber) api.select(byNumber.getAttribute('data-id'), auto.checked);
+          return;
+        }
+        if (at < 0) return;
+        var perRow = list.filter(function (card) { return card.offsetTop === list[0].offsetTop; }).length || 1;
+        var step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: perRow, ArrowUp: -perRow }[event.key];
+        if (!step) return;
+        var target = list[at + step];
+        if (target) { event.preventDefault(); target.focus(); }
       });
     })();
   </script>
@@ -462,6 +462,4 @@ function pickService({ services, lastServiceId }) {
   });
 }
 
-// fitToContent is exported so it can be exercised against a real window in
-// the verification harness; the app itself only uses pickService/focusPicker.
-module.exports = { pickService, focusPicker, fitToContent };
+module.exports = { pickService, focusPicker };

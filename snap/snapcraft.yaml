@@ -1,11 +1,11 @@
 name: veylo
 base: core22
 adopt-info: veylo
-summary: Lightweight streaming desktop client for Linux (Disney+, Netflix)
+summary: Lightweight streaming desktop client for Linux
 description: |
   A lightweight streaming desktop client for Linux. Wraps the official web
-  players of supported services (Disney+, Netflix) in a dedicated Chromium
-  shell with Widevine support, hardware video decoding, MPRIS media controls
+  players of supported services (Disney+, Netflix, Max, Apple TV+, Prime Video,
+  SkyShowtime, Crunchyroll) in a dedicated Chromium shell with Widevine support, hardware video decoding, MPRIS media controls
   and a tray icon.
 grade: stable
 confinement: strict
