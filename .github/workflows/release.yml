@@ -20,7 +20,10 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run icons
-      - run: npx electron-builder --linux AppImage tar.xz deb rpm
+      # --publish never: the release is created by the gh step below. Without
+      # it electron-builder infers a GitHub publish provider from package.json
+      # and fails in CI when no token is configured for it.
+      - run: npx electron-builder --linux AppImage tar.xz deb rpm --publish never
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
