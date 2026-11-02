@@ -25,7 +25,7 @@ function prefsFile() {
 }
 
 function load(file = prefsFile()) {
-  let raw = {};
+  let raw;
   try {
     raw = JSON.parse(fs.readFileSync(file, 'utf8')) || {};
   } catch (err) {

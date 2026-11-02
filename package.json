@@ -31,9 +31,10 @@
     "mpris-service": "^2.1.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "electron": "https://github.com/castlabs/electron-releases#v44.5.1+wvcus",
     "electron-builder": "^26.18.0",
-    "eslint": "^9.15.0"
+    "eslint": "^10.13.0"
   },
   "engines": {
     "node": ">=20"
