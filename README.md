@@ -3,15 +3,16 @@
 [![veylo](https://snapcraft.io/veylo/trending.svg?name=0)](https://snapcraft.io/veylo)
 
 A lightweight desktop client for streaming services on Linux — Disney+,
-Netflix, Max, Apple TV+, Prime Video, SkyShowtime, Crunchyroll, Pluto TV and
-Tubi — built on
+Netflix, Max, Apple TV+, Prime Video, SkyShowtime, Crunchyroll, Pluto TV, Tubi,
+Peacock and Paramount+ — built on
 [Electron for Content Security](https://github.com/castlabs/electron-releases)
 (castLabs' Electron fork) so that protected playback works through Widevine.
 
 > **Unofficial.** This client is not endorsed by, sponsored by, or connected to
-> Disney, Netflix, Warner Bros. Discovery, Apple, Amazon, Paramount, Fox, or
-> their parent companies. "Disney+", "Netflix", "Max", "Apple TV+", "Prime
-> Video", "SkyShowtime", "Crunchyroll", "Pluto TV" and "Tubi" are
+> Disney, Netflix, Warner Bros. Discovery, Apple, Amazon, Paramount, NBCUniversal,
+> Fox, or their parent companies. "Disney+", "Netflix", "Max", "Apple TV+",
+> "Prime Video", "SkyShowtime", "Crunchyroll", "Pluto TV", "Tubi", "Peacock" and
+> "Paramount+" are
 > trademarks of their respective owners. The client renders each service's
 > own web player; it does not bypass DRM or reverse engineer any streaming
 > service.
@@ -57,6 +58,8 @@ browser spends on everything else.
 | Crunchyroll | Linux Chrome | Plays on Linux as-is |
 | Pluto TV | Linux Chrome | Plays on Linux as-is; free, ad-supported; 30 countries |
 | Tubi | Linux Chrome | Plays on Linux as-is; free, ad-supported; 12 countries, the EU excluded |
+| Peacock | Windows Chrome | Refuses Linux clients; US and five US territories only |
+| Paramount+ | Windows Chrome | Refuses Linux clients; 29 countries (Hungary included) |
 
 Switch services with `Ctrl+1`…`Ctrl+9` (the order of the table above), or
 launch one directly, skipping the chooser:

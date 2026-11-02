@@ -290,6 +290,73 @@ const SERVICES = [
     // No externalHostSuffixes: help links live on tubitv.com itself, which
     // is already allowed above.
   },
+  {
+    id: 'peacock',
+    name: 'Peacock',
+    startUrl: 'https://www.peacocktv.com/',
+    backgroundColor: '#0a0a0a',
+    partition: 'persist:veylo-peacock',
+    // Peacock streams in the United States and five US territories only;
+    // anywhere else the site answers with its "Unavailable In Your Region"
+    // page, so the service is offered only there (see availableIn).
+    availableIn: ['US', 'AS', 'GU', 'MP', 'PR', 'VI'],
+    // Peacock's help lists its browsers as Chrome/Firefox/Edge on Windows and
+    // Mac only — no Linux — so the service is presented as Windows Chrome, the
+    // same approach as Disney+ and Apple TV+. Unlike Netflix, NBCUniversal
+    // does not appear to cross-check the platform the Widevine CDM reports in
+    // the licence request, so the spoof does not break DRM.
+    identity: 'windows',
+    icon: path.join(__dirname, '..', 'assets', 'peacock.jpg'),
+    allowedHostSuffixes: [
+      'peacocktv.com', // site, sign-in (id.*), account, playback (ovp.*), CDN (*.cdn.peacocktv.com)
+      'peacock.com', // legacy brand domain
+      'nbcuott.com', // NBCUniversal OTT platform APIs (atom.*, prod.*)
+      'nbcuni.com', // NBCUniversal shared endpoints
+      'nbcuniversal.com', // corporate and privacy pages referenced by the site
+      'cookielaw.org', // OneTrust consent banner (cdn.cookielaw.org)
+      'adobedtm.com', // Adobe Tag Manager (assets.adobedtm.com)
+      'jscrambler.com', // client-side code protection the player loads
+      'ada.support', // support widget (static.ada.support)
+    ],
+    externalHostSuffixes: [
+      'nbcuniversal.com',
+      'nbcunicareers.com',
+    ],
+  },
+  {
+    id: 'paramountplus',
+    name: 'Paramount+',
+    startUrl: 'https://www.paramountplus.com/',
+    backgroundColor: '#001438',
+    partition: 'persist:veylo-paramountplus',
+    // The 28 countries on the service's own global page
+    // (paramountplus.com/global/), plus the US home market. From anywhere else
+    // the site redirects to the country picker instead of a catalogue.
+    availableIn: ['US', 'AR', 'AT', 'AU', 'BO', 'BR', 'CA', 'CH', 'CL', 'CO', 'CR', 'DE', 'DO', 'EC', 'FR', 'GB', 'GT', 'HN', 'HU', 'IE', 'IT', 'MX', 'NI', 'PA', 'PE', 'PY', 'SV', 'UY', 'VE'],
+    // Paramount+'s help lists its desktop browsers as Chrome on Windows and
+    // Mac only — no Linux — so the service is presented as Windows Chrome, the
+    // same approach as Disney+, Apple TV+ and Peacock. Unlike Netflix,
+    // Paramount does not appear to cross-check the platform the Widevine CDM
+    // reports in the licence request, so the spoof does not break DRM.
+    identity: 'windows',
+    icon: path.join(__dirname, '..', 'assets', 'paramountplus.jpg'),
+    allowedHostSuffixes: [
+      'paramountplus.com', // site, sign-in, account, playback (karb.*, sparrow.*), intl country sites
+      'paramount.com', // shared brand and privacy endpoints (privacy.*, legal.*, cdn.privacy.paramount.com)
+      'cbsig.net', // CBS Interactive image CDN (thumbnails.cbsig.net)
+      'cbsinteractive.com', // legacy CBS endpoints (legalterms.*)
+      'pplusstatic.com', // static assets (wwwimage-intl.pplusstatic.com)
+      'cookielaw.org', // OneTrust consent banner (cdn.cookielaw.org)
+      'redfast.com', // engagement/consent conduit (conduit.redfast.com)
+      'recaptcha.net', // sign-in captcha (www.recaptcha.net)
+      'adobe.com', // entitlement check the player calls (entitlement.auth.adobe.com)
+      'skyshowtime.com', // sister service cross-links (same Comcast/Paramount joint venture)
+    ],
+    externalHostSuffixes: [
+      'help.paramountplus.com',
+      'support.paramountplus.com',
+    ],
+  },
 ];
 
 const DEFAULT_SERVICE_ID = 'disneyplus';

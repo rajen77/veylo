@@ -122,17 +122,36 @@ describe('regional availability', () => {
     assert.ok(!ids.includes('skyshowtime'));
     assert.ok(!ids.includes('plutotv'));
     assert.ok(!ids.includes('tubi'));
+    assert.ok(!ids.includes('peacock'));
+    assert.ok(!ids.includes('paramountplus'));
   });
 
   it('keeps the registry order and filters per country', () => {
-    const us = visibleServices('US').map((service) => service.id);
-    assert.deepEqual(us, SERVICES.filter((s) => s.id !== 'skyshowtime').map((s) => s.id));
-    assert.ok(us.includes('plutotv'));
-    assert.ok(us.includes('tubi'));
+    const restricted = SERVICES.filter((s) => s.availableIn).map((s) => s.id);
 
+    // The US gets every service: Peacock and the free services are US-first,
+    // SkyShowtime is the only one that is not offered there.
+    const us = visibleServices('US').map((service) => service.id);
+    assert.deepEqual(
+      us,
+      SERVICES.filter((s) => s.id !== 'skyshowtime').map((s) => s.id),
+    );
+    assert.ok(us.includes('peacock'));
+    assert.ok(us.includes('plutotv'));
+
+    // Hungary: Paramount+ and SkyShowtime are offered, the US-only and
+    // EU-excluded ones are not.
     const hu = visibleServices('HU').map((service) => service.id);
-    assert.deepEqual(hu, SERVICES.filter((s) => !['plutotv', 'tubi'].includes(s.id)).map((s) => s.id));
+    assert.ok(hu.includes('paramountplus'));
     assert.ok(hu.includes('skyshowtime'));
+    assert.ok(!hu.includes('peacock'));
+    assert.ok(!hu.includes('plutotv'));
+    assert.ok(!hu.includes('tubi'));
     assert.ok(hu.length < SERVICES.length);
+
+    // Every restricted service is hidden somewhere, so the lists are real.
+    for (const id of restricted) {
+      assert.ok(!visibleServices('ZZ').some((s) => s.id === id), id);
+    }
   });
 });

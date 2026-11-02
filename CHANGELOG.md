@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- Added Pluto TV and Tubi (both free, ad-supported; `Ctrl+1`…`Ctrl+9` now covers all nine services).
+- Added Pluto TV and Tubi (both free, ad-supported).
 - Regional availability: the chooser, the Service menu and `--service` only offer the services that stream in the country resolved from the client's IP (`VEYLO_REGION` pins it).
+- Added Peacock (US only) and Paramount+ (29 countries), both presented as Windows Chrome because their help pages list no Linux browser.
 
 ## 0.6.0
 
