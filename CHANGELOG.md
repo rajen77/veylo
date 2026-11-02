@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Added Pluto TV and Tubi (both free, ad-supported; `Ctrl+1`…`Ctrl+9` now covers all nine services).
+
 ## 0.6.0
 
 - Update checks now default to the GitHub releases feed (`VEYLO_UPDATE_FEED` still overrides it).

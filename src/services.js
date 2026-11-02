@@ -232,6 +232,53 @@ const SERVICES = [
     // No externalHostSuffixes: help links live on help.crunchyroll.com, which
     // the `crunchyroll.com` suffix above already covers.
   },
+  {
+    id: 'plutotv',
+    name: 'Pluto TV',
+    startUrl: 'https://pluto.tv/',
+    backgroundColor: '#1b1145',
+    partition: 'persist:veylo-plutotv',
+    // Pluto TV's web player runs in a regular browser on Linux, so the real
+    // platform is kept — the same reasoning as Netflix, Max, Prime Video,
+    // SkyShowtime and Crunchyroll: the Widevine CDM reports `Linux` in the
+    // licence request, and a contradicting claim risks breaking the DRM
+    // exchange.
+    identity: 'linux',
+    icon: path.join(__dirname, '..', 'assets', 'plutotv.jpg'),
+    allowedHostSuffixes: [
+      'pluto.tv', // site, guide, player, auth, and the *.prd.pluto.tv service/CDN hosts
+      'plutotv.net', // legacy service endpoints still referenced by the player
+      'paramount.com', // Paramount Streaming: consent delivery (cdn.privacy.paramount.com) and shared account infrastructure
+      'ketchcdn.com', // consent management (global.ketchcdn.com)
+      'adobedc.net', // Adobe Experience Platform consent/analytics (data.adobedc.net)
+      'datadoghq.com', // client-side telemetry
+    ],
+    // No externalHostSuffixes: help and legal links live on pluto.tv itself,
+    // which is already allowed above.
+  },
+  {
+    id: 'tubi',
+    name: 'Tubi',
+    startUrl: 'https://tubitv.com/',
+    backgroundColor: '#160b04',
+    partition: 'persist:veylo-tubi',
+    // Tubi's web player runs in a regular browser on Linux, so the real
+    // platform is kept — the same reasoning as Netflix, Max, Prime Video,
+    // SkyShowtime, Crunchyroll and Pluto TV: the Widevine CDM reports `Linux`
+    // in the licence request, and a contradicting claim risks breaking the
+    // DRM exchange. Note that Tubi is not offered in the EU: from an EU IP
+    // the service answers with the gdpr.tubi.tv interstitial instead of the
+    // catalogue, which the allowlist below covers.
+    identity: 'linux',
+    icon: path.join(__dirname, '..', 'assets', 'tubi.jpg'),
+    allowedHostSuffixes: [
+      'tubitv.com', // site, sign-in, account and playback APIs
+      'tubi.tv', // service endpoints and the GDPR interstitial (gdpr.tubi.tv)
+      'tubi.io', // media delivery and previews (video-previews-cdn.production-public.tubi.io)
+    ],
+    // No externalHostSuffixes: help links live on tubitv.com itself, which
+    // is already allowed above.
+  },
 ];
 
 const DEFAULT_SERVICE_ID = 'disneyplus';

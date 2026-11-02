@@ -3,14 +3,15 @@
 [![veylo](https://snapcraft.io/veylo/trending.svg?name=0)](https://snapcraft.io/veylo)
 
 A lightweight desktop client for streaming services on Linux — Disney+,
-Netflix, Max, Apple TV+, Prime Video, SkyShowtime and Crunchyroll — built on
+Netflix, Max, Apple TV+, Prime Video, SkyShowtime, Crunchyroll, Pluto TV and
+Tubi — built on
 [Electron for Content Security](https://github.com/castlabs/electron-releases)
 (castLabs' Electron fork) so that protected playback works through Widevine.
 
 > **Unofficial.** This client is not endorsed by, sponsored by, or connected to
-> Disney, Netflix, Warner Bros. Discovery, Apple, Amazon, or their parent
-> companies. "Disney+", "Netflix", "Max", "Apple TV+", "Prime Video",
-> "SkyShowtime" and "Crunchyroll" are
+> Disney, Netflix, Warner Bros. Discovery, Apple, Amazon, Paramount, Fox, or
+> their parent companies. "Disney+", "Netflix", "Max", "Apple TV+", "Prime
+> Video", "SkyShowtime", "Crunchyroll", "Pluto TV" and "Tubi" are
 > trademarks of their respective owners. The client renders each service's
 > own web player; it does not bypass DRM or reverse engineer any streaming
 > service.
@@ -53,6 +54,8 @@ browser spends on everything else.
 | Prime Video | Linux Chrome | Plays on Linux as-is; sign-in happens on the regional `amazon.*` domains, which the allowlist covers |
 | SkyShowtime | Linux Chrome | Plays on Linux as-is |
 | Crunchyroll | Linux Chrome | Plays on Linux as-is |
+| Pluto TV | Linux Chrome | Plays on Linux as-is; free, ad-supported |
+| Tubi | Linux Chrome | Plays on Linux as-is; free, ad-supported, but not offered in the EU (GDPR interstitial from an EU IP) |
 
 Switch services with `Ctrl+1`…`Ctrl+9` (the order of the table above), or
 launch one directly, skipping the chooser:
