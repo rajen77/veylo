@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.0
 
 - Added Pluto TV and Tubi (both free, ad-supported).
 - Regional availability: the chooser, the Service menu and `--service` only offer the services that stream in the country resolved from the client's IP (`VEYLO_REGION` pins it).

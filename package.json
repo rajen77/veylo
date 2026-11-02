@@ -1,6 +1,6 @@
 {
   "name": "veylo",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Lightweight streaming desktop client for Linux (Disney+, Netflix, Max, Apple TV+, Prime Video, SkyShowtime, Crunchyroll), built on Electron for Content Security (Widevine).",
   "license": "MIT",
   "private": true,
