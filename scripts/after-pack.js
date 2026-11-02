@@ -3,7 +3,7 @@
 /**
  * Unpacks the snap template into the packed application directory.
  *
- * Why this exists: electron-builder's snap target (v26.15.3, template path)
+ * Why this exists: electron-builder's snap target (v26.18.0, template path)
  * downloads its snap template as a `.tar.7z`, unpacks the 7z into its cache —
  * and then passes the *inner tar archive itself* to mksquashfs instead of
  * unpacking it. The archive is where the launcher scripts (`desktop-init.sh`
@@ -37,7 +37,7 @@ const run = promisify(execFile);
 
 // Must match SNAP_TEMPLATES.amd64 in app-builder-lib/out/targets/snap/coreLegacy.js,
 // as installed in this exact builder version; checked in afterPack() below.
-const BUILDER_VERSION = '26.15.3';
+const BUILDER_VERSION = '26.18.0';
 const TEMPLATE = {
   releaseName: 'snap-template-4.0-2',
   filenameWithExt: 'snap-template-electron-4.0-2-amd64.tar.7z',

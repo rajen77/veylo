@@ -16,7 +16,7 @@ downloads a prebuilt snap template and packs everything with `mksquashfs`.
 
 ## The template is unpacked by a hook (and why)
 
-electron-builder v26.15.3 downloads its snap template as a **tar archive** and
+electron-builder v26.18.0 downloads its snap template as a **tar archive** and
 passes the archive itself to `mksquashfs` instead of unpacking it. The archive
 is where `desktop-init.sh` and its siblings **and** the runtime libraries
 (`usr/lib/x86_64-linux-gnu/libnspr4.so`, `libnss3.so`, …) live, yet the
