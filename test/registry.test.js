@@ -4,7 +4,13 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
-const { SERVICES, allowedHostSuffixes } = require('../src/services');
+const {
+  SERVICES,
+  allowedHostSuffixes,
+  getService,
+  availableInRegion,
+  visibleServices,
+} = require('../src/services');
 const { isAllowed, isExternal, isPermissionAllowed } = require('../src/security');
 const { computeLayout } = require('../src/picker-layout');
 const { serviceFromArgv } = require('../src/cli');
@@ -82,5 +88,51 @@ describe('serviceFromArgv', () => {
   it('ignores unknown or missing services', () => {
     assert.equal(serviceFromArgv(['--service=nope']), null);
     assert.equal(serviceFromArgv([]), null);
+  });
+});
+
+describe('regional availability', () => {
+  it('gives restricted services a list of valid country codes', () => {
+    for (const service of SERVICES.filter((entry) => entry.availableIn)) {
+      assert.ok(service.availableIn.length > 0, service.id);
+      for (const code of service.availableIn) {
+        assert.match(code, /^[A-Z]{2}$/, `${service.id}: ${code}`);
+      }
+      assert.equal(new Set(service.availableIn).size, service.availableIn.length, service.id);
+    }
+  });
+
+  it('offers an unrestricted service everywhere, including an unknown region', () => {
+    const netflix = getService('netflix');
+    assert.equal(netflix.availableIn, undefined);
+    assert.equal(availableInRegion(netflix, 'HU'), true);
+    assert.equal(availableInRegion(netflix, null), true);
+  });
+
+  it('offers a restricted service only in its own countries', () => {
+    const skyshowtime = getService('skyshowtime');
+    assert.equal(availableInRegion(skyshowtime, 'HU'), true);
+    assert.equal(availableInRegion(skyshowtime, 'US'), false);
+    assert.equal(availableInRegion(skyshowtime, null), false);
+  });
+
+  it('hides the geo-restricted services when the region is unknown', () => {
+    const ids = visibleServices(null).map((service) => service.id);
+    assert.ok(ids.includes('netflix'));
+    assert.ok(!ids.includes('skyshowtime'));
+    assert.ok(!ids.includes('plutotv'));
+    assert.ok(!ids.includes('tubi'));
+  });
+
+  it('keeps the registry order and filters per country', () => {
+    const us = visibleServices('US').map((service) => service.id);
+    assert.deepEqual(us, SERVICES.filter((s) => s.id !== 'skyshowtime').map((s) => s.id));
+    assert.ok(us.includes('plutotv'));
+    assert.ok(us.includes('tubi'));
+
+    const hu = visibleServices('HU').map((service) => service.id);
+    assert.deepEqual(hu, SERVICES.filter((s) => !['plutotv', 'tubi'].includes(s.id)).map((s) => s.id));
+    assert.ok(hu.includes('skyshowtime'));
+    assert.ok(hu.length < SERVICES.length);
   });
 });

@@ -199,6 +199,9 @@ const SERVICES = [
     startUrl: 'https://www.skyshowtime.com/',
     backgroundColor: '#0b1220',
     partition: 'persist:veylo-skyshowtime',
+    // The 22 countries whose content the service's own sitemap lists
+    // (skyshowtime.com/sitemap.xml); outside them the site has no catalogue.
+    availableIn: ['AD', 'AL', 'BA', 'BG', 'CZ', 'DK', 'ES', 'FI', 'HR', 'HU', 'ME', 'MK', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'SE', 'SI', 'SK', 'XK'],
     // SkyShowtime's web player runs in a regular browser on Linux, so the real
     // platform is kept — the same reasoning as Netflix, Max and Prime Video:
     // the Widevine CDM reports `Linux` in the licence request, and a
@@ -238,6 +241,10 @@ const SERVICES = [
     startUrl: 'https://pluto.tv/',
     backgroundColor: '#1b1145',
     partition: 'persist:veylo-plutotv',
+    // Pluto TV streams in 30 countries (its own region list, pluto.tv/sitemap/):
+    // the US, Canada, the UK, parts of Western and Northern Europe and Latin
+    // America. Hungary is not one of them, so the service is not offered here.
+    availableIn: ['US', 'CA', 'GB', 'DE', 'AT', 'CH', 'FR', 'IT', 'ES', 'DK', 'NO', 'SE', 'AR', 'BO', 'BR', 'CL', 'CO', 'CR', 'DO', 'EC', 'SV', 'GT', 'HN', 'MX', 'NI', 'PA', 'PY', 'PE', 'UY', 'VE'],
     // Pluto TV's web player runs in a regular browser on Linux, so the real
     // platform is kept — the same reasoning as Netflix, Max, Prime Video,
     // SkyShowtime and Crunchyroll: the Widevine CDM reports `Linux` in the
@@ -262,6 +269,10 @@ const SERVICES = [
     startUrl: 'https://tubitv.com/',
     backgroundColor: '#160b04',
     partition: 'persist:veylo-tubi',
+    // Tubi streams in 12 countries (its help page for devices outside the US).
+    // The whole EU has been excluded since the GDPR took effect in 2018, so
+    // the service is not offered here.
+    availableIn: ['US', 'CA', 'MX', 'GB', 'AU', 'NZ', 'PR', 'CR', 'EC', 'SV', 'GT', 'PA'],
     // Tubi's web player runs in a regular browser on Linux, so the real
     // platform is kept — the same reasoning as Netflix, Max, Prime Video,
     // SkyShowtime, Crunchyroll and Pluto TV: the Widevine CDM reports `Linux`
@@ -298,6 +309,28 @@ function resolveService(id) {
   return getService(id) || getService(DEFAULT_SERVICE_ID);
 }
 
+/**
+ * Whether the service streams in the given country.
+ *
+ * A service without an `availableIn` list is offered everywhere. A restricted
+ * one is offered only in its own countries — and never when the country is
+ * unknown, because presenting it would only lead to the service's location
+ * screen (see src/region.js).
+ *
+ * @param {object} service
+ * @param {string|null} country ISO 3166-1 alpha-2 code, or null when unknown
+ */
+function availableInRegion(service, country) {
+  if (!service || !service.availableIn) return true;
+  if (!country) return false;
+  return service.availableIn.includes(country);
+}
+
+/** The registry in order, minus the services that do not stream here. */
+function visibleServices(country) {
+  return SERVICES.filter((service) => availableInRegion(service, country));
+}
+
 module.exports = {
   SERVICES,
   DEFAULT_SERVICE_ID,
@@ -305,4 +338,6 @@ module.exports = {
   getService,
   allowedHostSuffixes,
   resolveService,
+  availableInRegion,
+  visibleServices,
 };

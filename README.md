@@ -42,6 +42,7 @@ browser spends on everything else.
   and size, and which monitor it was on
 - Single-instance lock, so a second launch focuses the running window
 - Flatpak packaging and an update check against the GitHub releases (override with `VEYLO_UPDATE_FEED`)
+- Regional availability: only the services that stream in your country are offered (see [Regional availability](#regional-availability))
 
 ## Supported services
 
@@ -52,10 +53,10 @@ browser spends on everything else.
 | Max (HBO) | Linux Chrome | Plays on Linux as-is |
 | Apple TV+ | Windows Chrome | Refuses to play on a Linux identity; hardware-secure Widevine requests are downgraded to software-secure (see `src/eme.js`) |
 | Prime Video | Linux Chrome | Plays on Linux as-is; sign-in happens on the regional `amazon.*` domains, which the allowlist covers |
-| SkyShowtime | Linux Chrome | Plays on Linux as-is |
+| SkyShowtime | Linux Chrome | Plays on Linux as-is; 22 European countries |
 | Crunchyroll | Linux Chrome | Plays on Linux as-is |
-| Pluto TV | Linux Chrome | Plays on Linux as-is; free, ad-supported |
-| Tubi | Linux Chrome | Plays on Linux as-is; free, ad-supported, but not offered in the EU (GDPR interstitial from an EU IP) |
+| Pluto TV | Linux Chrome | Plays on Linux as-is; free, ad-supported; 30 countries |
+| Tubi | Linux Chrome | Plays on Linux as-is; free, ad-supported; 12 countries, the EU excluded |
 
 Switch services with `Ctrl+1`…`Ctrl+9` (the order of the table above), or
 launch one directly, skipping the chooser:
@@ -67,6 +68,20 @@ veylo --service=netflix
 Each service keeps its own session partition, so sign-ins never mix. The
 per-service platform identity is documented in `src/services.js` and
 `src/user-agent.js`.
+
+### Regional availability
+
+Some services only license their catalogue to certain countries and answer
+anything else with a location screen. At startup the client resolves the
+country from its own IP address (one request to a geolocation endpoint, see
+`src/region.js`) and offers only the services that stream there — in the
+chooser, in the Streaming Service menu and to `--service`. A service without
+an `availableIn` list in `src/services.js` is offered everywhere; when the
+country cannot be determined, the restricted services stay hidden rather than
+opening a dead end.
+
+Set `VEYLO_REGION=<ISO 3166-1 alpha-2>` (for example `VEYLO_REGION=US`) to pin
+the country without the lookup.
 
 ## Requirements
 

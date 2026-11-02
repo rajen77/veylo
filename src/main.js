@@ -43,7 +43,8 @@ const { Playback } = require('./playback');
 const { TrayController } = require('./tray');
 const { Updater } = require('./updater');
 const { buildMenu } = require('./menu');
-const { SERVICES, getService, resolveService } = require('./services');
+const { getService, resolveService, availableInRegion, visibleServices } = require('./services');
+const { detectCountry, regionCode } = require('./region');
 const prefsStore = require('./prefs');
 const { pickService, focusPicker } = require('./picker');
 const { serviceFromArgv } = require('./cli');
@@ -76,7 +77,10 @@ app.setAppUserModelId('io.github.veylo.Client');
 // Which service to open, and whether to open it without asking. Read before
 // the window exists so the very first launch already knows what to show.
 let prefs = prefsStore.load();
-// `--service=<id>` opens that service directly, skipping the chooser.
+// `--service=<id>` opens that service directly, skipping the chooser. A
+// service that does not stream in this country is refused here as well: the
+// country is only known after the lookup in whenReady, so the flag is checked
+// again there before the window is created.
 const cliService = serviceFromArgv(process.argv.slice(1));
 let activeService = cliService || resolveService(prefs.lastServiceId);
 let switching = false;
@@ -166,7 +170,7 @@ function rebuildMenu() {
     media: playback,
     updater,
     flags: applied,
-    services: SERVICES,
+    services: visibleServices(regionCode()),
     activeServiceId: activeService.id,
     autoOpen: prefs.autoOpen,
     languagePref: prefs.language,
@@ -199,6 +203,12 @@ function rebuildMenu() {
 async function switchService(id) {
   const next = getService(id);
   if (!next || next.id === activeService.id) return;
+  // The Service menu only offers what streams here, but the id can also come
+  // from `--service` on a second launch, so the check is repeated.
+  if (!availableInRegion(next, regionCode())) {
+    log.warn(`Refusing ${next.name}: not available in this region.`);
+    return;
+  }
   if (switching) return;
   switching = true;
   try {
@@ -289,6 +299,18 @@ app.whenReady().then(async () => {
     log.warn('This client targets Linux; other platforms are untested.');
   }
 
+  // The country decides which services are offered (see src/region.js). It is
+  // resolved before the chooser and the menu are built, both of which read the
+  // filtered list, and before the window is created, so `--service` cannot open
+  // a service that does not stream here. A failure only hides the restricted
+  // services; it never delays startup beyond the timeout.
+  const country = await detectCountry();
+  log.info(`Region: ${country || 'unknown'}`);
+  if (cliService && !availableInRegion(cliService, country)) {
+    log.warn(`--service=${cliService.id} is not available in this region; falling back to the chooser.`);
+    activeService = resolveService(prefs.lastServiceId);
+  }
+
   // The Widevine CDM is installed by the Component Updater on first launch. A
   // window created before this resolves will fail EME negotiation, so the
   // player window waits for it below. The wait is started here rather than
@@ -313,7 +335,7 @@ app.whenReady().then(async () => {
     pickerOpen = true;
     let choice;
     try {
-      choice = await pickService({ services: SERVICES, lastServiceId: activeService.id });
+      choice = await pickService({ services: visibleServices(country), lastServiceId: activeService.id });
     } finally {
       pickerOpen = false;
     }
