@@ -74,7 +74,7 @@ function inspectSandbox({ electronBinary } = {}) {
   // in the launcher, so the caller supplies the real binary when it knows it.
   const binary = electronBinary || process.execPath;
   const helper = path.join(path.dirname(binary), 'chrome-sandbox');
-  let helperSetuid = false;
+  let helperSetuid;
   try {
     const stat = fs.statSync(helper);
     // setuid bit set and owned by root -> the SUID sandbox path is available.

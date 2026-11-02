@@ -311,7 +311,7 @@ app.whenReady().then(async () => {
   // own window, so the main one is only created once the answer is in.
   if (!prefs.autoOpen && !cliService) {
     pickerOpen = true;
-    let choice = null;
+    let choice;
     try {
       choice = await pickService({ services: SERVICES, lastServiceId: activeService.id });
     } finally {
