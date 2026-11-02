@@ -12,10 +12,6 @@ files:
   - locales/**/*
   - package.json
 
-# Unpacks the snap template (launcher scripts + runtime libs) into the packed
-# app. See scripts/after-pack.js.
-afterPack: scripts/after-pack.js
-
 # The Widevine CDM must never be bundled: ECS downloads it on first launch from
 # Google's component service. Shipping it would breach the Widevine licence.
 asar: true
@@ -54,7 +50,7 @@ linux:
   synopsis: Lightweight streaming desktop client
   description: >-
     A lightweight streaming desktop client for Linux. Wraps the official
-    web players of supported services (Disney+, Netflix, Max, Apple TV+, Prime Video, SkyShowtime, Crunchyroll) in a dedicated
+    web players of supported services (Disney+, Netflix, Max, Apple TV+, Prime Video, SkyShowtime, Crunchyroll, Pluto TV, Tubi, Peacock, Paramount+) in a dedicated
     Chromium shell with Widevine support, hardware video decoding, MPRIS
     media controls and a tray icon.
   desktop:
