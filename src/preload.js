@@ -9,37 +9,40 @@ const { ipcRenderer } = require('electron');
  * outward through IPC.
  *
  * Playback control in the opposite direction is done by driving the existing
- * <video> element and the player's own buttons, exactly as a user would.
+ * media element and the player's own buttons, exactly as a user would.
  */
 
 const POLL_INTERVAL_MS = 1000;
 // The shift pass walks the whole DOM, so it is not run on the fast poll; see
 // startTitlebar() for the events that drive it and this safety-net interval.
 const OFFSET_POLL_MS = 5000;
-// Coalesces bursts of DOM mutations into one video scan.
+// Coalesces bursts of DOM mutations into one media scan.
 const SCAN_DEBOUNCE_MS = 250;
-const VIDEO_EVENTS = [
+const MEDIA_EVENTS = [
   'play', 'pause', 'ended', 'timeupdate', 'durationchange',
   'loadedmetadata', 'volumechange', 'ratechange', 'seeking', 'seeked',
 ];
 
-let currentVideo = null;
+let currentMedia = null;
 let pollTimer = null;
 let scanTimer = null;
 let pushTimer = null;
 let lastPushedState = null;
 let lastPushAt = 0;
 
-function activeVideo() {
+function activeMedia() {
   const videos = Array.from(document.querySelectorAll('video'));
-  if (videos.length === 0) return null;
   // The main feature is always the largest element on screen; trailers and
   // background previews are small.
-  return videos.reduce((best, v) => {
+  const video = videos.reduce((best, v) => {
     const area = (v.clientWidth || 0) * (v.clientHeight || 0);
     const bestArea = best ? (best.clientWidth || 0) * (best.clientHeight || 0) : -1;
     return area > bestArea ? v : best;
   }, null);
+  const audio = Array.from(document.querySelectorAll('audio'));
+  const playingAudio = audio.find((element) => !element.paused && !element.ended);
+  if (playingAudio && (!video || video.paused || video.ended)) return playingAudio;
+  return video || playingAudio || audio.find((element) => !element.ended) || audio[0] || null;
 }
 
 // The suffix pattern depends only on the service name, and readTitle() runs on
@@ -83,7 +86,7 @@ function readArtwork() {
 }
 
 function snapshot() {
-  const video = activeVideo();
+  const video = activeMedia();
   if (!video) return { hasVideo: false };
 
   const paused = video.paused || video.ended;
@@ -156,24 +159,23 @@ function push() {
   }, POLL_INTERVAL_MS - (now - lastPushAt));
 }
 
-function attach(video) {
-  if (video === currentVideo) return;
-  currentVideo = video;
-  for (const name of VIDEO_EVENTS) video.addEventListener(name, push, { passive: true });
+function attach(media) {
+  if (media === currentMedia) return;
+  if (currentMedia) {
+    for (const name of MEDIA_EVENTS) currentMedia.removeEventListener(name, push);
+  }
+  currentMedia = media;
+  if (media) {
+    for (const name of MEDIA_EVENTS) media.addEventListener(name, push, { passive: true });
+  }
   push();
 }
 
 function scan() {
-  const video = activeVideo();
-  if (video) {
-    // attach() pushes only when the video actually changed; an unchanged video
-    // still needs the regular poll push, but not a second one right after one.
-    const changed = video !== currentVideo;
-    attach(video);
-    if (!changed) push();
-    return;
-  }
-  if (currentVideo) push();
+  const media = activeMedia();
+  const changed = media !== currentMedia;
+  attach(media);
+  if (media && !changed) push();
 }
 
 /**
@@ -210,15 +212,15 @@ function clickByLabel(patterns) {
 
 const COMMANDS = {
   play() {
-    const video = activeVideo();
+    const video = activeMedia();
     if (video && video.paused) video.play().catch(() => clickByLabel(['play', 'lejátszás']));
   },
   pause() {
-    const video = activeVideo();
+    const video = activeMedia();
     if (video && !video.paused) video.pause();
   },
   playpause() {
-    const video = activeVideo();
+    const video = activeMedia();
     if (!video) {
       clickByLabel(['play', 'lejátszás']);
       return;
@@ -233,7 +235,7 @@ const COMMANDS = {
     clickByLabel(['previous episode', 'previous', 'előző']);
   },
   stop() {
-    const video = activeVideo();
+    const video = activeMedia();
     if (video) {
       video.pause();
       try {
@@ -244,7 +246,7 @@ const COMMANDS = {
     }
   },
   seek(payload) {
-    const video = activeVideo();
+    const video = activeMedia();
     if (!video || !Number.isFinite(video.duration)) return;
     const offset = Number(payload);
     if (!Number.isFinite(offset)) return;
@@ -254,7 +256,7 @@ const COMMANDS = {
     push();
   },
   setposition(payload) {
-    const video = activeVideo();
+    const video = activeMedia();
     if (!video) return;
     const seconds = Number(payload);
     if (!Number.isFinite(seconds)) return;
@@ -263,7 +265,7 @@ const COMMANDS = {
     push();
   },
   setvolume(payload) {
-    const video = activeVideo();
+    const video = activeMedia();
     if (!video) return;
     const level = Number(payload);
     if (!Number.isFinite(level)) return;
@@ -272,7 +274,7 @@ const COMMANDS = {
     push();
   },
   setmute(payload) {
-    const video = activeVideo();
+    const video = activeMedia();
     if (!video) return;
     video.muted = Boolean(payload);
     push();
@@ -319,22 +321,22 @@ let titlebarLabels = {
 };
 
 const TITLEBAR_ICONS = {
-  menu: '<path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
-  fullscreen:
-    '<path d="M2.5 6V3.6a1.1 1.1 0 0 1 1.1-1.1H6M10 2.5h2.4a1.1 1.1 0 0 1 1.1 1.1V6M13.5 10v2.4a1.1 1.1 0 0 1-1.1 1.1H10M6 13.5H3.6a1.1 1.1 0 0 1-1.1-1.1V10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
-  exitFullscreen:
-    '<path d="M6 2.5V5.4a.6.6 0 0 1-.6.6H2.5M10 2.5v2.9a.6.6 0 0 0 .6.6h2.9M6 13.5v-2.9a.6.6 0 0 0-.6-.6H2.5M10 13.5v-2.9a.6.6 0 0 1 .6-.6h2.9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
-  minimize: '<path d="M3 8h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
-  maximize: '<rect x="3.3" y="3.3" width="9.4" height="9.4" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.4"/>',
-  restore:
-    '<rect x="2.6" y="5.2" width="8.2" height="8.2" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M5.4 5.2V4.1A1.5 1.5 0 0 1 6.9 2.6h5.1a1.4 1.4 0 0 1 1.4 1.4v5.1a1.5 1.5 0 0 1-1.5 1.5h-1.1" fill="none" stroke="currentColor" stroke-width="1.3"/>',
-  close: '<path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
+  menu: [{ d: 'M2.5 4.5h11M2.5 8h11M2.5 11.5h11' }],
+  fullscreen: [{ d: 'M2.5 6V3.6a1.1 1.1 0 0 1 1.1-1.1H6M10 2.5h2.4a1.1 1.1 0 0 1 1.1 1.1V6M13.5 10v2.4a1.1 1.1 0 0 1-1.1 1.1H10M6 13.5H3.6a1.1 1.1 0 0 1-1.1-1.1V10' }],
+  exitFullscreen: [{ d: 'M6 2.5V5.4a.6.6 0 0 1-.6.6H2.5M10 2.5v2.9a.6.6 0 0 0 .6.6h2.9M6 13.5v-2.9a.6.6 0 0 0-.6-.6H2.5M10 13.5v-2.9a.6.6 0 0 1 .6-.6h2.9' }],
+  minimize: [{ d: 'M3 8h10' }],
+  maximize: [{ tag: 'rect', x: '3.3', y: '3.3', width: '9.4', height: '9.4', rx: '1.3' }],
+  restore: [
+    { tag: 'rect', x: '2.6', y: '5.2', width: '8.2', height: '8.2', rx: '1.3' },
+    { d: 'M5.4 5.2V4.1A1.5 1.5 0 0 1 6.9 2.6h5.1a1.4 1.4 0 0 1 1.4 1.4v5.1a1.5 1.5 0 0 1-1.5 1.5h-1.1' },
+  ],
+  close: [{ d: 'M4 4l8 8M12 4l-8 8' }],
 };
 
 const TITLEBAR_STYLES = `
 #${TITLEBAR_ID} {
   position: fixed; top: 0; left: 0; right: 0; height: ${TITLEBAR_HEIGHT}px;
-  display: flex; align-items: center; background: #0b1220;
+  box-sizing: border-box; display: flex; align-items: center; background: #0b1220;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07); color: #e6ecf5;
   font: 12px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   z-index: 2147483647; user-select: none; -webkit-user-select: none;
@@ -364,6 +366,14 @@ const TITLEBAR_STYLES = `
 html.veylo-titlebar-offset { padding-top: ${TITLEBAR_HEIGHT}px !important; }
 `;
 
+// Plex positions its app against the viewport, ignoring the root padding.
+const PLEX_TITLEBAR_STYLES = `
+html.veylo-titlebar-offset body > #plex {
+  top: ${TITLEBAR_HEIGHT}px !important;
+  height: calc(100% - ${TITLEBAR_HEIGHT}px) !important;
+}
+`;
+
 // Mirrors the main process; updated through window:titlebar-state.
 const titlebarState = { title: 'Veylo', maximized: false, fullscreen: false };
 
@@ -375,7 +385,27 @@ let titlebarRebuildTimer = null;
 let titlebarParts = null;
 
 function titlebarIcon(name) {
-  return `<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">${TITLEBAR_ICONS[name] || ''}</svg>`;
+  const namespace = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(namespace, 'svg');
+  for (const [key, value] of Object.entries({
+    viewBox: '0 0 16 16', width: '16', height: '16', 'aria-hidden': 'true',
+    fill: 'none', stroke: 'currentColor', 'stroke-width': name === 'restore' ? '1.3' : '1.4',
+    'stroke-linecap': 'round',
+  })) svg.setAttribute(key, value);
+  for (const shape of TITLEBAR_ICONS[name] || []) {
+    const element = document.createElementNS(namespace, shape.tag || 'path');
+    for (const [key, value] of Object.entries(shape)) {
+      if (key !== 'tag') element.setAttribute(key, value);
+    }
+    svg.appendChild(element);
+  }
+  return svg;
+}
+
+function setTitlebarIcon(button, name) {
+  if (button.dataset.icon === name) return;
+  button.replaceChildren(titlebarIcon(name));
+  button.dataset.icon = name;
 }
 
 /** The label a control shows right now; two of them follow the window state. */
@@ -429,7 +459,7 @@ function createTitlebar() {
     const label = titlebarLabelFor(spec.id);
     button.title = label;
     button.setAttribute('aria-label', label);
-    button.innerHTML = titlebarIcon(spec.id);
+    setTitlebarIcon(button, spec.id);
     bar.appendChild(button);
     buttons.set(spec.id, button);
   }
@@ -610,7 +640,7 @@ function buildTitlebar() {
   if (!document.getElementById(TITLEBAR_ID + '-style')) {
     const style = document.createElement('style');
     style.id = TITLEBAR_ID + '-style';
-    style.textContent = TITLEBAR_STYLES;
+    style.textContent = TITLEBAR_STYLES + (window.location.hostname === 'app.plex.tv' ? PLEX_TITLEBAR_STYLES : '');
     root.appendChild(style);
   }
 
@@ -647,16 +677,10 @@ function buildTitlebar() {
   }
 
   const fullscreenButton = buttons.get('fullscreen');
-  const fullscreenIcon = titlebarIcon(titlebarState.fullscreen ? 'exitFullscreen' : 'fullscreen');
-  if (fullscreenButton && fullscreenButton.innerHTML !== fullscreenIcon) {
-    fullscreenButton.innerHTML = fullscreenIcon;
-  }
+  if (fullscreenButton) setTitlebarIcon(fullscreenButton, titlebarState.fullscreen ? 'exitFullscreen' : 'fullscreen');
 
   const maximizeButton = buttons.get('maximize');
-  const maximizeIcon = titlebarIcon(titlebarState.maximized ? 'restore' : 'maximize');
-  if (maximizeButton && maximizeButton.innerHTML !== maximizeIcon) {
-    maximizeButton.innerHTML = maximizeIcon;
-  }
+  if (maximizeButton) setTitlebarIcon(maximizeButton, titlebarState.maximized ? 'restore' : 'maximize');
 
   // In fullscreen the strip is hidden so the video fills the screen, and it is
   // revealed again when the pointer reaches the top edge. Without that the

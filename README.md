@@ -4,15 +4,15 @@
 
 A lightweight desktop client for streaming services on Linux — Disney+,
 Netflix, Max, Apple TV+, Prime Video, SkyShowtime, Crunchyroll, Pluto TV, Tubi,
-Peacock and Paramount+ — built on
+Peacock, Paramount+, YouTube, YouTube Music and Plex — built on
 [Electron for Content Security](https://github.com/castlabs/electron-releases)
 (castLabs' Electron fork) so that protected playback works through Widevine.
 
 > **Unofficial.** This client is not endorsed by, sponsored by, or connected to
 > Disney, Netflix, Warner Bros. Discovery, Apple, Amazon, Paramount, NBCUniversal,
-> Fox, or their parent companies. "Disney+", "Netflix", "Max", "Apple TV+",
+> Fox, Google, Plex, or their parent companies. "Disney+", "Netflix", "Max", "Apple TV+",
 > "Prime Video", "SkyShowtime", "Crunchyroll", "Pluto TV", "Tubi", "Peacock" and
-> "Paramount+" are
+> "Paramount+", "YouTube", "YouTube Music" and "Plex" are
 > trademarks of their respective owners. The client renders each service's
 > own web player; it does not bypass DRM or reverse engineer any streaming
 > service.
@@ -60,6 +60,9 @@ browser spends on everything else.
 | Tubi | Linux Chrome | Plays on Linux as-is; free, ad-supported; 12 countries, the EU excluded |
 | Peacock | Windows Chrome | Refuses Linux clients; US and five US territories only |
 | Paramount+ | Windows Chrome | Refuses Linux clients; 29 countries (Hungary included) |
+| YouTube | Linux Chrome | Experimental; Google sign-in and playback have not been verified |
+| YouTube Music | Linux Chrome | Experimental; Google sign-in and audio playback have not been verified; available in [listed regions](https://support.google.com/youtubemusic/answer/6313540) |
+| Plex | Linux Chrome | Experimental; sign-in, free content and personal media servers have not been verified |
 
 Switch services with `Ctrl+1`…`Ctrl+9` (the order of the table above), or
 launch one directly, skipping the chooser:
@@ -71,6 +74,13 @@ veylo --service=netflix
 Each service keeps its own session partition, so sign-ins never mix. The
 per-service platform identity is documented in `src/services.js` and
 `src/user-agent.js`.
+
+Google may refuse sign-in from embedded browsers. Plex content availability varies by
+country, and its own server access may depend on the server's network and
+security settings. YouTube Music is filtered using Google's published locations
+(Russia is temporarily unavailable; South Korea requires a paid membership).
+YouTube and Plex are offered without a country filter; that does not guarantee
+that every title or feature is available everywhere.
 
 ### Regional availability
 
@@ -93,9 +103,9 @@ the country without the lookup.
 - Node.js 20 or newer when building from source
 - A Widevine CDM — supplied by the castLabs build and fetched on first run
 
-The services stream DRM-protected content. Expect 720p through the
-software-secure L3 path; higher resolutions require a hardware-secure path
-that this configuration does not provide.
+Some services stream DRM-protected content. For those, expect up to 720p
+through the software-secure L3 path; higher resolutions may require a
+hardware-secure path that this configuration does not provide.
 
 ## Distribution support
 

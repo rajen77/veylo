@@ -57,7 +57,7 @@ fi
 EDIST="$WORK/electron-arm64"
 if [ ! -d "$EDIST/locales" ]; then
   echo ">> unpacking Electron dist"
-  rm -rf "$EDIST"
+  rm -rf dist/snap-build/electron-arm64
   mkdir -p "$EDIST"
   unzip -q "$WORK/electron-${TAG}-linux-arm64.zip" -d "$EDIST"
 fi
@@ -76,7 +76,7 @@ fi
 # --- 3. runtime libraries ---------------------------------------------------
 # The amd64 template tar ships only x86_64 libraries, so the arm64
 # equivalents come from Ubuntu focal (20.04), pinned per release.
-PORTS=http://ports.ubuntu.com/ubuntu-ports
+PORTS=https://ports.ubuntu.com/ubuntu-ports
 DEBS=(
   pool/main/libb/libbsd/libbsd0_0.10.0-1_arm64.deb
   pool/main/e/e2fsprogs/libcom-err2_1.45.5-2ubuntu1_arm64.deb
@@ -106,7 +106,7 @@ fi
 # --- 4. assemble the snap root ----------------------------------------------
 echo ">> assembling snap root"
 STAGE="$WORK/root"
-rm -rf "$STAGE"
+rm -rf dist/snap-build/root
 mkdir -p "$STAGE"
 
 # application files
@@ -167,7 +167,7 @@ mksquashfs "$STAGE" "$OUT" -no-progress -quiet -noappend \
 
 # --- 6. verify --------------------------------------------------------------
 echo ">> verifying"
-rm -rf "$WORK/check"
+rm -rf dist/snap-build/check
 mkdir -p "$WORK/check"
 unsquashfs -quiet -f -d "$WORK/check" "$OUT" veylo meta/snap.yaml >/dev/null
 file -b "$WORK/check/veylo" | grep -q "aarch64" || {
@@ -182,7 +182,7 @@ if unsquashfs -ll "$OUT" | grep -v "root/root" | grep -q .; then
   echo "error: image contains non-root owned entries" >&2
   exit 1
 fi
-rm -rf "$WORK/check"
+rm -rf dist/snap-build/check
 
 echo ">> done: $OUT"
 ls -la dist/snap/

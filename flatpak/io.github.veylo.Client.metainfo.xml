@@ -8,7 +8,7 @@
   <description>
     <p>
       A lightweight streaming desktop client for Linux. It wraps the official
-      web players of supported services (Disney+, Netflix, Max, Apple TV+, Prime Video, SkyShowtime, Crunchyroll, Pluto TV, Tubi, Peacock, Paramount+) in a dedicated
+      web players of supported services (Disney+, Netflix, Max, Apple TV+, Prime Video, SkyShowtime, Crunchyroll, Pluto TV, Tubi, Peacock, Paramount+, YouTube, YouTube Music and Plex) in a dedicated
       Chromium shell with Widevine support, hardware video decoding, MPRIS
       media controls and a tray icon.
     </p>
@@ -28,6 +28,15 @@
     <category>Player</category>
   </categories>
   <releases>
+    <release version="0.8.0" date="2026-11-17">
+      <description>
+        <ul>
+          <li>Add YouTube, YouTube Music and Plex</li>
+          <li>Support audio playback in desktop media controls</li>
+          <li>Fix title-bar visibility on YouTube and layout on Plex</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.7.0" date="2026-11-02">
       <description>
         <ul>

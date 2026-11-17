@@ -89,9 +89,28 @@ describe('serviceFromArgv', () => {
     assert.equal(serviceFromArgv(['--service=nope']), null);
     assert.equal(serviceFromArgv([]), null);
   });
+
+  it('opens the new services with independent sessions', () => {
+    for (const id of ['youtube', 'youtubemusic', 'plex']) {
+      const service = serviceFromArgv([`--service=${id}`]);
+      assert.equal(service.id, id);
+      assert.equal(service.partition, `persist:veylo-${id}`);
+      assert.equal(service.identity, 'linux');
+    }
+  });
 });
 
 describe('regional availability', () => {
+  it('uses the published YouTube Music regions and hides it when unknown', () => {
+    const ids = visibleServices(null).map((service) => service.id);
+    for (const id of ['youtube', 'plex']) assert.ok(ids.includes(id));
+    assert.ok(!ids.includes('youtubemusic'));
+    const music = getService('youtubemusic');
+    assert.equal(availableInRegion(music, 'HU'), true);
+    assert.equal(availableInRegion(music, 'US'), true);
+    assert.equal(availableInRegion(music, 'RU'), false);
+    assert.equal(availableInRegion(music, 'ZZ'), false);
+  });
   it('gives restricted services a list of valid country codes', () => {
     for (const service of SERVICES.filter((entry) => entry.availableIn)) {
       assert.ok(service.availableIn.length > 0, service.id);

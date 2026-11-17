@@ -32,6 +32,20 @@ describe('isAllowed', () => {
     assert.equal(isAllowed('https://www.netflix.com/watch', netflix), true);
   });
 
+  it('allows the new services and their sign-in or consent navigation', () => {
+    for (const id of ['youtube', 'youtubemusic']) {
+      const service = getService(id);
+      assert.equal(isAllowed('https://consent.youtube.com/', service), true);
+      assert.equal(isAllowed('https://accounts.google.com/', service), true);
+      assert.equal(isAllowed('https://www.youtube.com/watch?v=example', service), true);
+      assert.equal(isAllowed('https://youtube.com.example.invalid/', service), false);
+    }
+    const plex = getService('plex');
+    assert.equal(isAllowed('https://app.plex.tv/desktop/', plex), true);
+    assert.equal(isAllowed('https://www.plex.tv/sign-in/', plex), true);
+    assert.equal(isAllowed('https://plex.tv.example.invalid/', plex), false);
+  });
+
   it('refuses other hosts, plain http and unparseable urls', () => {
     assert.equal(isAllowed('https://example.com/', disney), false);
     assert.equal(isAllowed('http://www.disneyplus.com/', disney), false);

@@ -12,8 +12,7 @@ const path = require('node:path');
  * turns the host lists into the navigation allowlist; the picker, the menu and
  * the window all read the rest.
  *
- * Adding a service is a matter of adding an entry — its icon is expected at
- * `assets/<id>.jpg`.
+ * Adding a service is a matter of adding an entry with its icon under assets/.
  */
 
 // Hosts every service legitimately needs: DRM licence delivery and the CDN
@@ -356,6 +355,50 @@ const SERVICES = [
       'help.paramountplus.com',
       'support.paramountplus.com',
     ],
+  },
+  {
+    id: 'youtube',
+    name: 'YouTube',
+    startUrl: 'https://www.youtube.com/',
+    backgroundColor: '#0f0f0f',
+    partition: 'persist:veylo-youtube',
+    identity: 'linux',
+    icon: path.join(__dirname, '..', 'assets', 'youtube.jpg'),
+    allowedHostSuffixes: ['youtube.com', 'youtu.be', 'youtube-nocookie.com'],
+  },
+  {
+    id: 'youtubemusic',
+    name: 'YouTube Music',
+    startUrl: 'https://music.youtube.com/',
+    backgroundColor: '#030303',
+    partition: 'persist:veylo-youtubemusic',
+    // Google's published YouTube Music locations, excluding Russia, which is
+    // listed as temporarily unavailable. South Korea requires a paid plan.
+    availableIn: [
+      'DZ', 'AS', 'AR', 'AW', 'AU', 'AT', 'AZ', 'BH', 'BD', 'BY', 'BE', 'BM', 'BO', 'BA',
+      'BR', 'BG', 'KH', 'CA', 'KY', 'CL', 'CO', 'CR', 'HR', 'CY', 'CZ', 'DK', 'DO', 'EC',
+      'EG', 'SV', 'EE', 'FI', 'FR', 'GF', 'PF', 'GE', 'DE', 'GH', 'GR', 'GP', 'GU', 'GT',
+      'HN', 'HK', 'HU', 'IS', 'IN', 'ID', 'IQ', 'IE', 'IL', 'IT', 'JM', 'JP', 'JO', 'KZ',
+      'KE', 'KW', 'LA', 'LV', 'LB', 'LY', 'LI', 'LT', 'LU', 'MY', 'MT', 'MX', 'MA', 'NP',
+      'NL', 'NZ', 'NI', 'NG', 'MK', 'MP', 'NO', 'OM', 'PK', 'PA', 'PG', 'PY', 'PE', 'PH',
+      'PL', 'PT', 'PR', 'QA', 'RE', 'RO', 'SA', 'SN', 'RS', 'SG', 'SK', 'SI', 'ZA', 'KR',
+      'ES', 'LK', 'SE', 'CH', 'TW', 'TZ', 'TH', 'TN', 'TR', 'TC', 'VI', 'UG', 'UA', 'AE',
+      'GB', 'US', 'UY', 'VE', 'VN', 'YE', 'ZW',
+    ],
+    identity: 'linux',
+    icon: path.join(__dirname, '..', 'assets', 'youtube_music.jpg'),
+    allowedHostSuffixes: ['youtube.com', 'youtu.be', 'youtube-nocookie.com'],
+  },
+  {
+    id: 'plex',
+    name: 'Plex',
+    startUrl: 'https://app.plex.tv/desktop/',
+    backgroundColor: '#1f1f1f',
+    partition: 'persist:veylo-plex',
+    identity: 'linux',
+    icon: path.join(__dirname, '..', 'assets', 'plex.jpg'),
+    allowedHostSuffixes: ['plex.tv'],
+    externalHostSuffixes: ['support.plex.tv'],
   },
 ];
 
