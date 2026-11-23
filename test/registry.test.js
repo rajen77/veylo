@@ -10,6 +10,8 @@ const {
   getService,
   availableInRegion,
   visibleServices,
+  orderedServices,
+  moveService,
 } = require('../src/services');
 const { isAllowed, isExternal, isPermissionAllowed } = require('../src/security');
 const { computeLayout } = require('../src/picker-layout');
@@ -19,6 +21,29 @@ describe('services registry invariants', () => {
   it('has unique ids and partitions', () => {
     assert.equal(new Set(SERVICES.map((s) => s.id)).size, SERVICES.length);
     assert.equal(new Set(SERVICES.map((s) => s.partition)).size, SERVICES.length);
+  });
+
+  describe('service arrangement', () => {
+    const prefs = { favorites: ['plex', 'peacock'], serviceOrder: ['peacock', 'netflix', 'plex'], hideUnavailable: false };
+    it('shows all by default, putting favorites first in the saved order', () => {
+      const ids = orderedServices(prefs, 'HU').map((service) => service.id);
+      assert.equal(ids.length, SERVICES.length);
+      assert.deepEqual(ids.slice(0, 3), ['peacock', 'plex', 'netflix']);
+    });
+    it('optionally hides unavailable and unknown-region services without losing their order', () => {
+      const ids = orderedServices({ ...prefs, hideUnavailable: true }, 'HU').map((service) => service.id);
+      assert.ok(!ids.includes('peacock'));
+      assert.equal(ids[0], 'plex');
+      assert.ok(!orderedServices({ ...prefs, hideUnavailable: true }, null).some((service) => service.id === 'peacock'));
+      assert.equal(orderedServices(prefs, 'HU')[0].id, 'peacock');
+    });
+    it('moves within the favorite group and leaves hidden services intact', () => {
+      const moved = moveService(prefs, 'HU', 'plex', -1);
+      assert.deepEqual(orderedServices(moved, 'HU').slice(0, 2).map((service) => service.id), ['plex', 'peacock']);
+      const hidden = { ...moved, hideUnavailable: true };
+      assert.equal(moveService(hidden, 'HU', 'plex', 1), hidden);
+      assert.equal(moveService(prefs, 'HU', 'missing', 1), prefs);
+    });
   });
 
   for (const service of SERVICES) {
@@ -76,6 +101,16 @@ describe('computeLayout', () => {
     const layout = computeLayout({ ...base, cap: NaN, cardCount: 30 }, { width: 500, height: 600 });
     assert.ok(layout.width <= 500);
     assert.ok(layout.cols >= 1);
+  });
+
+  it('reserves the scrollbar width so columns do not disappear when content overflows', () => {
+    const layout = computeLayout(
+      { ...base, cardCount: 14, cap: 1154, scrollbar: 15 },
+      { width: 1920, height: 1080 },
+    );
+    assert.equal(layout.cols, 7);
+    assert.equal(layout.rows, 2);
+    assert.equal(layout.width, 48 + 7 * 150 + 6 * 12 + 15);
   });
 });
 

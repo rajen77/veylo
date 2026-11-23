@@ -7,7 +7,7 @@ const flags = require('./flags');
 const { applySwitches } = flags;
 const { shouldDisableSandbox } = require('./sandbox');
 
-const { app, BrowserWindow, components, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, components, dialog, ipcMain, Menu, screen } = require('electron');
 const log = require('./logger');
 
 // Chromium cannot start without a usable sandbox, and a missing one kills the
@@ -43,10 +43,11 @@ const { Playback } = require('./playback');
 const { TrayController } = require('./tray');
 const { Updater } = require('./updater');
 const { buildMenu } = require('./menu');
-const { getService, resolveService, availableInRegion, visibleServices } = require('./services');
-const { detectCountry, regionCode } = require('./region');
+const { SERVICES, getService, resolveService, availableInRegion, orderedServices } = require('./services');
+const { detectCountry, regionCode, confirmRegionalAccess } = require('./region');
 const prefsStore = require('./prefs');
 const { pickService, focusPicker } = require('./picker');
+const { load: loadWindowState, saveDisplay } = require('./window-state');
 const { serviceFromArgv } = require('./cli');
 const i18n = require('./i18n');
 
@@ -77,10 +78,7 @@ app.setAppUserModelId('io.github.veylo.Client');
 // Which service to open, and whether to open it without asking. Read before
 // the window exists so the very first launch already knows what to show.
 let prefs = prefsStore.load();
-// `--service=<id>` opens that service directly, skipping the chooser. A
-// service that does not stream in this country is refused here as well: the
-// country is only known after the lookup in whenReady, so the flag is checked
-// again there before the window is created.
+// `--service=<id>` opens that service directly after any regional warning.
 const cliService = serviceFromArgv(process.argv.slice(1));
 let activeService = cliService || resolveService(prefs.lastServiceId);
 let switching = false;
@@ -170,9 +168,14 @@ function rebuildMenu() {
     media: playback,
     updater,
     flags: applied,
-    services: visibleServices(regionCode()),
+    services: orderedServices(prefs, regionCode()).map((service) => ({
+      ...service,
+      unavailable: !availableInRegion(service, regionCode()),
+      unknownRegion: !regionCode(),
+    })),
     activeServiceId: activeService.id,
     autoOpen: prefs.autoOpen,
+    hideUnavailable: prefs.hideUnavailable,
     languagePref: prefs.language,
     onSwitchService: (id) => {
       switchService(id).catch((err) => log.error('Service switch failed:', err.message));
@@ -182,6 +185,16 @@ function rebuildMenu() {
       prefsStore.save(prefs);
       log.info(`Open on startup: ${prefs.autoOpen ? 'on' : 'off'}`);
       rebuildMenu();
+    },
+    onToggleHideUnavailable: () => {
+      prefs = { ...prefs, hideUnavailable: !prefs.hideUnavailable };
+      prefsStore.save(prefs);
+      rebuildMenu();
+    },
+    onOpenPicker: () => {
+      showPicker()
+        .then(() => { if (!windowController.isAlive) shutdown(0); })
+        .catch((err) => log.error('Service picker failed:', err.message));
     },
     onSetLanguage: (value) => {
       if (prefs.language === value) return;
@@ -200,25 +213,26 @@ function rebuildMenu() {
  * rather than navigated: each service has its own session partition, and a
  * BrowserWindow's partition is fixed when it is created.
  */
-async function switchService(id) {
+async function switchService(id, confirmed = false, displayId = null) {
   const next = getService(id);
-  if (!next || next.id === activeService.id) return;
-  // The Service menu only offers what streams here, but the id can also come
-  // from `--service` on a second launch, so the check is repeated.
-  if (!availableInRegion(next, regionCode())) {
-    log.warn(`Refusing ${next.name}: not available in this region.`);
-    return;
-  }
+  if (!next) return;
+  const sameDisplay = !windowController.isAlive || displayId === null ||
+    screen.getDisplayMatching(windowController.window.getBounds()).id === displayId;
+  if (next.id === activeService.id && sameDisplay) return;
   if (switching) return;
   switching = true;
   try {
+    if (!confirmed && !(await confirmService(next, windowController.window))) {
+      setImmediate(rebuildMenu);
+      return;
+    }
     log.info(`Switching service: ${activeService.name} → ${next.name}`);
     activeService = next;
     prefs = { ...prefs, lastServiceId: next.id };
     prefsStore.save(prefs);
     windowController.destroy();
     windowController.service = next;
-    windowController.create();
+    windowController.create({ displayId });
     // The cached window title still points at the old window.
     lastWindowTitle = null;
     playback.requestRefresh();
@@ -231,6 +245,67 @@ async function switchService(id) {
     setImmediate(rebuildMenu);
   } finally {
     switching = false;
+  }
+}
+
+async function confirmService(service, parent) {
+  return confirmRegionalAccess(service, regionCode(), parent, { dialog, t: i18n.t });
+}
+
+function changePickerPrefs(action, arrangement) {
+  if (action === 'hide' && typeof arrangement === 'boolean') {
+    prefs = { ...prefs, hideUnavailable: arrangement };
+  } else if (action === 'save' && arrangement &&
+    Array.isArray(arrangement.favorites) && Array.isArray(arrangement.serviceOrder) &&
+    [...arrangement.favorites, ...arrangement.serviceOrder].every((id) => typeof id === 'string' && getService(id))) {
+    prefs = {
+      ...prefs,
+      favorites: [...new Set(arrangement.favorites)],
+      serviceOrder: [...new Set(arrangement.serviceOrder)],
+    };
+  } else {
+    log.warn(`Invalid picker preference action: ${action}`);
+    return prefs;
+  }
+  prefsStore.save(prefs);
+  if (windowController.isAlive) rebuildMenu();
+  return prefs;
+}
+
+async function showPicker() {
+  if (pickerOpen) {
+    focusPicker();
+    return null;
+  }
+  pickerOpen = true;
+  try {
+    const display = windowController.isAlive
+      ? screen.getDisplayMatching(windowController.window.getBounds())
+      : screen.getAllDisplays().find((item) => item.id === loadWindowState().displayId) || screen.getPrimaryDisplay();
+    const choice = await pickService({
+      services: SERVICES,
+      lastServiceId: activeService.id,
+      prefs,
+      country: regionCode(),
+      onChange: changePickerPrefs,
+      confirm: confirmService,
+      display,
+      onClose: (displayId) => {
+        windowController.persistState();
+        saveDisplay(displayId);
+      },
+    });
+    if (!choice) return null;
+    prefs = { ...prefs, autoOpen: choice.autoOpen };
+    prefsStore.save(prefs);
+    if (windowController.isAlive) {
+      await switchService(choice.id, true, choice.displayId);
+      windowController.show();
+      rebuildMenu();
+    }
+    return choice;
+  } finally {
+    pickerOpen = false;
   }
 }
 
@@ -299,17 +374,9 @@ app.whenReady().then(async () => {
     log.warn('This client targets Linux; other platforms are untested.');
   }
 
-  // The country decides which services are offered (see src/region.js). It is
-  // resolved before the chooser and the menu are built, both of which read the
-  // filtered list, and before the window is created, so `--service` cannot open
-  // a service that does not stream here. A failure only hides the restricted
-  // services; it never delays startup beyond the timeout.
+  // Resolve the country before showing the chooser or opening a service.
   const country = await detectCountry();
   log.info(`Region: ${country || 'unknown'}`);
-  if (cliService && !availableInRegion(cliService, country)) {
-    log.warn(`--service=${cliService.id} is not available in this region; falling back to the chooser.`);
-    activeService = resolveService(prefs.lastServiceId);
-  }
 
   // The Widevine CDM is installed by the Component Updater on first launch. A
   // window created before this resolves will fail EME negotiation, so the
@@ -331,14 +398,11 @@ app.whenReady().then(async () => {
 
   // With "open on startup" off, ask which service to open. The chooser is its
   // own window, so the main one is only created once the answer is in.
-  if (!prefs.autoOpen && !cliService) {
-    pickerOpen = true;
-    let choice;
-    try {
-      choice = await pickService({ services: visibleServices(country), lastServiceId: activeService.id });
-    } finally {
-      pickerOpen = false;
-    }
+  let openDirectly = prefs.autoOpen || Boolean(cliService);
+  if (openDirectly && !(await confirmService(activeService, null))) openDirectly = false;
+  let pickerDisplayId = null;
+  if (!openDirectly) {
+    const choice = await showPicker();
     // Dismissing the chooser quits the app (it is the only window, so closing
     // it already triggered window-all-closed, which the flag above suppressed).
     if (!choice) {
@@ -346,6 +410,7 @@ app.whenReady().then(async () => {
       return;
     }
     activeService = resolveService(choice.id);
+    pickerDisplayId = choice.displayId;
     prefs = { ...prefs, lastServiceId: activeService.id, autoOpen: choice.autoOpen };
     prefsStore.save(prefs);
     windowController.service = activeService;
@@ -354,7 +419,7 @@ app.whenReady().then(async () => {
   // Nothing shown before this point needs the CDM, so the chooser above ran
   // while it was being prepared; the player window must not.
   await widevineReady;
-  windowController.create();
+  windowController.create({ displayId: pickerDisplayId });
 
   // The window must exist before the menu and tray can reference it.
   playback.start();

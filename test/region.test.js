@@ -9,7 +9,9 @@ const {
   setRegion,
   countryFromTrace,
   countryFromText,
+  confirmRegionalAccess,
 } = require('../src/region');
+const { getService } = require('../src/services');
 
 /** A fetch stand-in that answers each URL with the given body. */
 function fetchReturning(body, { ok = true, status = 200 } = {}) {
@@ -32,6 +34,27 @@ describe('country parsing', () => {
   it('reads the loc line out of a Cloudflare trace', () => {
     assert.equal(countryFromTrace('ip=1.2.3.4\nloc=HU\nw=0\n'), 'HU');
     assert.equal(countryFromTrace('loc=us\r\n'), 'US');
+  });
+
+  describe('regional confirmation', () => {
+    it('only prompts restricted or unknown services, and requires explicit confirmation every time', async () => {
+      const calls = [];
+      let response = 0;
+      const dialog = { showMessageBox: async (...args) => { calls.push(args); return { response }; } };
+      const t = (key) => key;
+      const parent = { isDestroyed: () => false };
+      assert.equal(await confirmRegionalAccess(getService('netflix'), 'HU', parent, { dialog, t }), true);
+      assert.equal(calls.length, 0);
+      assert.equal(await confirmRegionalAccess(getService('peacock'), 'HU', parent, { dialog, t }), false);
+      assert.equal(calls[0][0], parent);
+      assert.equal(calls[0][1].message, 'dialogs.region.unavailable');
+      assert.equal(calls[0][1].defaultId, 0);
+      response = 1;
+      assert.equal(await confirmRegionalAccess(getService('peacock'), 'HU', parent, { dialog, t }), true);
+      assert.equal(await confirmRegionalAccess(getService('peacock'), null, null, { dialog, t }), true);
+      assert.equal(calls.length, 3);
+      assert.equal(calls[2][0].message, 'dialogs.region.unknown');
+    });
   });
 
   it('reads a bare country code', () => {

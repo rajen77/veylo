@@ -19,6 +19,7 @@
     },
     "service": {
       "title": "Streaming Service",
+      "manage": "Choose and arrange services…",
       "autoOpen": "Open Last Service on Startup"
     },
     "language": {
@@ -51,13 +52,23 @@
     "ok": "OK"
   },
   "dialogs": {
+    "region": {
+      "title": "Regional availability",
+      "unavailable": "{service} is not listed as available in your country.",
+      "unknown": "Your country could not be determined, so availability of {service} is unknown.",
+      "detail": "A system-wide VPN connected to a supported country may be needed. Veylo does not provide a VPN; the service may still block VPN connections or require a local account.",
+      "cancel": "Cancel",
+      "open": "Open anyway"
+    },
     "diagnostics": {
       "title": "Diagnostics",
       "message": "Diagnostics copied to the clipboard."
     },
     "about": {
       "title": "About",
-      "detail": "Version {version}\n\nAn unofficial, lightweight desktop client for Linux. It displays the official web players of supported streaming services in a dedicated Chromium shell with Widevine support.\n\nNot affiliated with, endorsed by, or sponsored by any streaming service or its owner. Disney+ and Netflix are trademarks of their respective owners. A valid subscription to the chosen service is required."
+      "detail": "Version {version}\nDeveloper: {developer}\nCountry: Hungary\nDeveloper profile: {profile}\nProject: {project}\nLicense: {license}\n\nAn unofficial, lightweight desktop client for Linux. It displays the official web players of supported streaming services in a dedicated Chromium shell with Widevine support.\n\nNot affiliated with, endorsed by, or sponsored by any streaming service or its owner. Disney+ and Netflix are trademarks of their respective owners. A valid subscription to the chosen service is required.",
+      "developerProfile": "Developer profile",
+      "projectPage": "Project page"
     },
     "updates": {
       "title": "Updates",
@@ -81,6 +92,14 @@
     "heading": "Choose a streaming service",
     "subtitle": "Veylo opens the official web player of the service you pick.",
     "lastUsed": "Last used",
+    "arrange": "Arrange",
+    "finishArrange": "Done - save",
+    "favorite": "Toggle favorite",
+    "moveEarlier": "Move earlier",
+    "moveLater": "Move later",
+    "unavailable": "Not available in your region",
+    "unknownRegion": "Region unknown",
+    "hideUnavailable": "Hide services unavailable in my region",
     "autoOpen": "Open this service automatically on startup",
     "hint": "Change it any time from the Streaming Service menu."
   },

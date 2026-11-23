@@ -1,6 +1,7 @@
 'use strict';
 
 const log = require('./logger');
+const { availableInRegion } = require('./services');
 
 /**
  * Which country the client is streaming from.
@@ -8,16 +9,14 @@ const log = require('./logger');
  * A few services only license their catalogue to certain countries and answer
  * anything else with an interstitial — Tubi shows its GDPR page, Pluto TV a
  * location screen, Peacock an "Unavailable In Your Region" page. Opening such a
- * service here would only produce that screen, so the chooser, the Service menu
- * and `--service` offer the services that actually stream in this country
- * (see `availableIn` in src/services.js).
+ * service here may produce that screen, so the chooser and Service menu mark
+ * services not listed in this country (see `availableIn` in src/services.js).
  *
  * The country follows the caller's IP address, so it has to come from a
  * geolocation endpoint: the user agent is already spoofed per service (see
  * src/user-agent.js) and says nothing about where the machine is. One request
  * is made at startup; a failure is not retried within the same run, because a
- * missing country only has to hide the restricted services, never block
- * startup.
+ * missing country is reported as unknown, never as a confirmed restriction.
  *
  * `VEYLO_REGION=<ISO 3166-1 alpha-2>` pins the country without any lookup.
  * That is also the escape hatch when the endpoint is unreachable or wrong.
@@ -91,7 +90,7 @@ async function lookup({ fetchImpl, timeoutMs }) {
       log.debug(`Region lookup failed for ${endpoint.url}: ${err.message}`);
     }
   }
-  log.warn('Region could not be determined; geo-restricted services stay hidden.');
+  log.warn('Region could not be determined; availability of restricted services is unknown.');
   return null;
 }
 
@@ -121,8 +120,27 @@ async function detectCountry({ fetchImpl = fetch, timeoutMs = TIMEOUT_MS } = {})
   return inflight;
 }
 
+async function confirmRegionalAccess(service, country, parent, { dialog, t }) {
+  if (availableInRegion(service, country)) return true;
+  const options = {
+    type: 'warning',
+    title: t('dialogs.region.title'),
+    message: t(country ? 'dialogs.region.unavailable' : 'dialogs.region.unknown', { service: service.name }),
+    detail: t('dialogs.region.detail'),
+    buttons: [t('dialogs.region.cancel'), t('dialogs.region.open')],
+    defaultId: 0,
+    cancelId: 0,
+    noLink: true,
+  };
+  const result = parent && !parent.isDestroyed()
+    ? await dialog.showMessageBox(parent, options)
+    : await dialog.showMessageBox(options);
+  return result.response === 1;
+}
+
 module.exports = {
   detectCountry,
+  confirmRegionalAccess,
   regionCode,
   setRegion,
   countryFromTrace,

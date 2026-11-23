@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.9.0
+
+- Added favorite services and custom ordering, saved in the service chooser.
+- Show all services by default, mark regional restrictions and ask for confirmation before opening an unavailable or unknown-region service. An optional filter hides these services; Veylo does not provide a VPN.
+- Keep the chooser and player on the last-used monitor, including after moving the chooser to another display.
+- Extended service shortcuts to `Ctrl+Shift+1`…`Ctrl+Shift+9`, then `Ctrl+Shift+A`, `B` and so on, skipping reserved letters.
+- Added developer information and links to the About dialog.
+
+## 0.8.0
+
+- Added YouTube, YouTube Music and Plex.
+- Extended media controls to audio playback and fixed the YouTube title bar and Plex page layout.
+
 ## 0.7.0
 
 - Added Pluto TV and Tubi (both free, ad-supported).

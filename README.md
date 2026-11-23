@@ -43,7 +43,7 @@ browser spends on everything else.
   and size, and which monitor it was on
 - Single-instance lock, so a second launch focuses the running window
 - Flatpak packaging and an update check against the GitHub releases (override with `VEYLO_UPDATE_FEED`)
-- Regional availability: only the services that stream in your country are offered (see [Regional availability](#regional-availability))
+- Favorite services, custom ordering and optional hiding of region-restricted services (see [Regional availability](#regional-availability))
 
 ## Supported services
 
@@ -64,8 +64,10 @@ browser spends on everything else.
 | YouTube Music | Linux Chrome | Experimental; Google sign-in and audio playback have not been verified; available in [listed regions](https://support.google.com/youtubemusic/answer/6313540) |
 | Plex | Linux Chrome | Experimental; sign-in, free content and personal media servers have not been verified |
 
-Switch services with `Ctrl+1`…`Ctrl+9` (the order of the table above), or
-launch one directly, skipping the chooser:
+Switch services in the current menu order with `Ctrl+Shift+1`…`Ctrl+Shift+9`,
+followed by `Ctrl+Shift+A`, `Ctrl+Shift+B` and so on. The letters I, P and R
+are reserved for existing shortcuts. You can also launch one directly, skipping
+the chooser:
 
 ```bash
 veylo --service=netflix
@@ -77,7 +79,7 @@ per-service platform identity is documented in `src/services.js` and
 
 Google may refuse sign-in from embedded browsers. Plex content availability varies by
 country, and its own server access may depend on the server's network and
-security settings. YouTube Music is filtered using Google's published locations
+security settings. YouTube Music availability is marked using Google's published locations
 (Russia is temporarily unavailable; South Korea requires a paid membership).
 YouTube and Plex are offered without a country filter; that does not guarantee
 that every title or feature is available everywhere.
@@ -87,11 +89,23 @@ that every title or feature is available everywhere.
 Some services only license their catalogue to certain countries and answer
 anything else with a location screen. At startup the client resolves the
 country from its own IP address (one request to a geolocation endpoint, see
-`src/region.js`) and offers only the services that stream there — in the
-chooser, in the Streaming Service menu and to `--service`. A service without
-an `availableIn` list in `src/services.js` is offered everywhere; when the
-country cannot be determined, the restricted services stay hidden rather than
-opening a dead end.
+`src/region.js`). All services are shown by default; those not listed in the
+detected country are marked, and opening them requires confirmation each time,
+including on automatic startup or through `--service`. When the country cannot
+be determined, restricted services are marked as unknown instead. A system-wide
+VPN may be needed; Veylo does not provide one, and VPNs may be blocked.
+The country is detected once per launch, so restart Veylo after connecting or
+disconnecting a VPN to refresh the availability labels.
+
+Select **Arrange** in the chooser to show the star and arrow buttons; mark
+favorites and change their order, then select **Done - save** to save. Favorites
+appear first; the arrows reorder services within their group. Closing the chooser
+also saves any unfinished arrangement.
+The chooser and Streaming Service menu can hide or show services unavailable
+in the detected country (including those whose availability is unknown).
+Preferences are saved locally. The chooser reserves room for the full list and
+arrangement controls when the display permits; on smaller screens it scrolls.
+Open the chooser again via Streaming Service → Choose and arrange services.
 
 Set `VEYLO_REGION=<ISO 3166-1 alpha-2>` (for example `VEYLO_REGION=US`) to pin
 the country without the lookup.
@@ -196,8 +210,12 @@ the page is asked to leave the strip's height empty instead.
   window again while it is running.
 - **Window state is remembered** between runs: whether the window was windowed,
   maximized or fullscreen, its position and size, and which monitor it was on.
-  The state is written on every change rather than only at exit, so a crash or a
-  session logout does not lose it. It is stored in
+  The service chooser opens on the monitor where the chooser or player was last
+  closed, and a chosen service opens on the chooser's current monitor. If the
+  saved monitor is disconnected, the primary monitor is used. Window placement
+  can be restricted by Wayland compositors.
+  Player state is also saved during use; the chooser's monitor is saved when
+  it closes. The state is stored in
   `~/.var/app/io.github.veylo.Client/config/veylo/window-state.json`
   under Flatpak, or `~/.config/veylo/window-state.json`
   otherwise. Deleting that file resets the window to its defaults.

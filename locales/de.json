@@ -19,6 +19,7 @@
     },
     "service": {
       "title": "Streaming-Dienst",
+      "manage": "Dienste auswählen und sortieren…",
       "autoOpen": "Letzten Dienst beim Start öffnen"
     },
     "language": {
@@ -51,13 +52,23 @@
     "ok": "OK"
   },
   "dialogs": {
+    "region": {
+      "title": "Regionale Verfügbarkeit",
+      "unavailable": "{service} ist laut Liste in deinem Land nicht verfügbar.",
+      "unknown": "Dein Land konnte nicht ermittelt werden; die Verfügbarkeit von {service} ist unbekannt.",
+      "detail": "Ein systemweites VPN mit Verbindung zu einem unterstützten Land kann erforderlich sein. Veylo bietet kein VPN; der Dienst kann VPN-Verbindungen dennoch blockieren oder ein lokales Konto verlangen.",
+      "cancel": "Abbrechen",
+      "open": "Trotzdem öffnen"
+    },
     "diagnostics": {
       "title": "Diagnose",
       "message": "Diagnose in die Zwischenablage kopiert."
     },
     "about": {
       "title": "Über",
-      "detail": "Version {version}\n\nEin inoffizielles, leichtgewichtiges Desktop-Client für Linux. Er zeigt die offiziellen Webplayer unterstützter Streaming-Dienste in einer eigenen Chromium-Umgebung mit Widevine-Unterstützung an.\n\nKeine Verbindung zu einem Streaming-Dienst oder dessen Eigentümer; keine Billigung oder Finanzierung durch diese. Disney+ und Netflix sind Marken der jeweiligen Inhaber. Für den gewählten Dienst ist ein gültiges Abonnement erforderlich."
+      "detail": "Version {version}\nEntwickler: {developer}\nLand: Ungarn\nEntwicklerprofil: {profile}\nProjekt: {project}\nLizenz: {license}\n\nEin inoffizieller, leichtgewichtiger Desktop-Client für Linux. Er zeigt die offiziellen Webplayer unterstützter Streaming-Dienste in einer eigenen Chromium-Umgebung mit Widevine-Unterstützung an.\n\nKeine Verbindung zu einem Streaming-Dienst oder dessen Eigentümer; keine Billigung oder Finanzierung durch diese. Disney+ und Netflix sind Marken der jeweiligen Inhaber. Für den gewählten Dienst ist ein gültiges Abonnement erforderlich.",
+      "developerProfile": "Entwicklerprofil",
+      "projectPage": "Projektseite"
     },
     "updates": {
       "title": "Updates",
@@ -81,6 +92,14 @@
     "heading": "Streaming-Dienst auswählen",
     "subtitle": "Veylo öffnet den offiziellen Webplayer des gewählten Dienstes.",
     "lastUsed": "Zuletzt verwendet",
+    "arrange": "Sortieren",
+    "finishArrange": "Fertig – speichern",
+    "favorite": "Favorit umschalten",
+    "moveEarlier": "Nach vorne verschieben",
+    "moveLater": "Nach hinten verschieben",
+    "unavailable": "In deiner Region nicht verfügbar",
+    "unknownRegion": "Region unbekannt",
+    "hideUnavailable": "In meiner Region nicht verfügbare Dienste ausblenden",
     "autoOpen": "Diesen Dienst beim Start automatisch öffnen",
     "hint": "Jederzeit im Menü Streaming-Dienst änderbar."
   },

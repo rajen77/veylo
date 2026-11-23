@@ -5,6 +5,10 @@
   <summary>Lightweight streaming desktop client</summary>
   <metadata_license>MIT</metadata_license>
   <project_license>MIT</project_license>
+  <developer id="io.github.rajen77">
+    <name>Szabó Kornél</name>
+  </developer>
+  <url type="homepage">https://github.com/rajen77/veylo</url>
   <description>
     <p>
       A lightweight streaming desktop client for Linux. It wraps the official
@@ -28,6 +32,16 @@
     <category>Player</category>
   </categories>
   <releases>
+    <release version="0.9.0" date="2026-11-23">
+      <description>
+        <ul>
+          <li>Arrange favorite services and choose whether to hide region-restricted services</li>
+          <li>Show regional availability warnings before opening restricted services</li>
+          <li>Remember the chooser and player monitor across launches</li>
+          <li>Extend service-switching keyboard shortcuts</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.8.0" date="2026-11-17">
       <description>
         <ul>

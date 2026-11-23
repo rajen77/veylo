@@ -103,13 +103,13 @@ function clampToDisplay(bounds, display) {
  * removed display falls back to the primary one, and unusable geometry is
  * discarded in favour of the defaults.
  */
-function load(storedFile = stateFile()) {
+function load(storedFile = stateFile(), preferredDisplayId = null) {
   const screen = getScreen();
   try {
     const raw = JSON.parse(fs.readFileSync(storedFile, 'utf8'));
 
     const mode = MODES.includes(raw.mode) ? raw.mode : 'normal';
-    const display = displayById(raw.displayId) || screen.getPrimaryDisplay();
+    const display = displayById(preferredDisplayId) || displayById(raw.displayId) || screen.getPrimaryDisplay();
 
     let bounds = isRectangle(raw.bounds) ? raw.bounds : null;
     if (!bounds && isRectangle(raw)) {
@@ -125,12 +125,27 @@ function load(storedFile = stateFile()) {
       };
     }
 
+    const area = display.workArea;
+    const overlaps = bounds.x < area.x + area.width && bounds.x + bounds.width > area.x &&
+      bounds.y < area.y + area.height && bounds.y + bounds.height > area.y;
+    // The windowed bounds can belong to a different display when the user
+    // moves a maximized/fullscreen window; an 80px strip is not enough to make
+    // the window manager maximize it on the intended display.
+    if (!overlaps || screen.getDisplayMatching(bounds).id !== display.id) {
+      bounds = clampToDisplay(bounds, display);
+      bounds = {
+        ...bounds,
+        x: area.x + Math.round((area.width - bounds.width) / 2),
+        y: area.y + Math.round((area.height - bounds.height) / 2),
+      };
+    }
+
     return { mode, displayId: display.id, bounds: clampToDisplay(bounds, display) };
   } catch (err) {
     if (err.code !== 'ENOENT') {
       log.warn(`Window state could not be read from ${storedFile}: ${err.message}`);
     }
-    const display = screen.getPrimaryDisplay();
+    const display = displayById(preferredDisplayId) || screen.getPrimaryDisplay();
     return {
       mode: 'normal',
       displayId: display.id,
@@ -142,6 +157,22 @@ function load(storedFile = stateFile()) {
       },
     };
   }
+}
+
+function writeState(file, state) {
+  const payload = { ...state, savedAt: new Date().toISOString() };
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `${JSON.stringify(payload, null, 2)}\n`);
+    log.debug(`Window state saved: ${state.mode} ${JSON.stringify(state.bounds)} display ${state.displayId}`);
+  } catch (err) {
+    log.warn(`Window state could not be saved to ${file}: ${err.message}`);
+  }
+}
+
+/** Remember the chooser's display without changing the player's mode or size. */
+function saveDisplay(displayId, storedFile = stateFile()) {
+  writeState(storedFile, load(storedFile, displayId));
 }
 
 /**
@@ -236,7 +267,7 @@ class WindowStateKeeper {
   /** Snapshot the geometry that matters, from the sources that actually hold it. */
   capture() {
     const win = this.window;
-    if (!win || win.isDestroyed()) return;
+    if (!win || win.isDestroyed() || win.isMinimized()) return;
 
     this.mode = this.currentMode();
     this.rememberDisplay();
@@ -322,26 +353,17 @@ class WindowStateKeeper {
     // seeded; writing null bounds would lose the position entirely.
     if (!this.bounds) return;
 
-    const payload = {
+    const state = {
       mode: this.mode,
       displayId: this.displayId,
       bounds: this.bounds,
-      // Kept for readability when someone opens the file.
-      savedAt: new Date().toISOString(),
     };
-
-    try {
-      const file = this.file;
-      fs.mkdirSync(path.dirname(file), { recursive: true });
-      fs.writeFileSync(file, `${JSON.stringify(payload, null, 2)}\n`);
-      log.debug(`Window state saved: ${this.mode} ${JSON.stringify(this.bounds)} display ${this.displayId}`);
-    } catch (err) {
-      log.warn(`Window state could not be saved to ${this.file}: ${err.message}`);
-    }
+    writeState(this.file, state);
   }
 
   /** Flush a pending debounce before the process exits. */
   flush() {
+    const settling = Boolean(this.settleTimer);
     if (this.saveTimer) {
       clearTimeout(this.saveTimer);
       this.saveTimer = null;
@@ -350,8 +372,10 @@ class WindowStateKeeper {
       clearTimeout(this.settleTimer);
       this.settleTimer = null;
     }
+    if (settling && this.window && !this.window.isDestroyed() && !this.window.isMinimized()) this.rememberDisplay();
+    else this.capture();
     this.save();
   }
 }
 
-module.exports = { load, WindowStateKeeper, stateFile, clampToDisplay, MODES };
+module.exports = { load, saveDisplay, WindowStateKeeper, stateFile, clampToDisplay, MODES };

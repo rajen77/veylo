@@ -39,7 +39,15 @@ function load(file = prefsFile()) {
     lastServiceId: getService(raw.lastServiceId) ? raw.lastServiceId : DEFAULT_SERVICE_ID,
     autoOpen: raw.autoOpen === true,
     language: typeof raw.language === 'string' && raw.language ? raw.language : 'auto',
+    favorites: serviceIds(raw.favorites),
+    serviceOrder: serviceIds(raw.serviceOrder),
+    hideUnavailable: raw.hideUnavailable === true,
   };
+}
+
+function serviceIds(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter((id) => typeof id === 'string' && getService(id)))];
 }
 
 function save(prefs, file = prefsFile()) {

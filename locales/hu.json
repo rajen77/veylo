@@ -19,6 +19,7 @@
     },
     "service": {
       "title": "Streaming szolgáltatás",
+      "manage": "Szolgáltatások kiválasztása és rendezése…",
       "autoOpen": "Indításkor az utolsó szolgáltatás megnyitása"
     },
     "language": {
@@ -51,13 +52,23 @@
     "ok": "Rendben"
   },
   "dialogs": {
+    "region": {
+      "title": "Területi elérhetőség",
+      "unavailable": "A(z) {service} a nyilvántartás szerint nem érhető el az országodban.",
+      "unknown": "Az országot nem sikerült meghatározni, ezért a(z) {service} elérhetősége ismeretlen.",
+      "detail": "Szükség lehet egy támogatott országhoz kapcsolódó rendszerszintű VPN-re. A Veylo nem biztosít VPN-t; a szolgáltató a VPN-t blokkolhatja, vagy helyi fiókot kérhet.",
+      "cancel": "Mégse",
+      "open": "Megnyitás ennek ellenére"
+    },
     "diagnostics": {
       "title": "Diagnosztika",
       "message": "A diagnosztika a vágólapra másolva."
     },
     "about": {
       "title": "Névjegy",
-      "detail": "Verzió {version}\n\nNem hivatalos, könnyű asztali kliens Linuxra. A támogatott streaming szolgáltatások hivatalos weblejátszóit jeleníti meg egy külön Chromium-környezetben, Widevine-támogatással.\n\nNem áll kapcsolatban egyetlen streaming szolgáltatással vagy annak tulajdonosával, és azok nem támogatják, nem szponzorálják. A Disney+ és a Netflix a tulajdonosuk védjegye. A választott szolgáltatás érvényes előfizetése szükséges."
+      "detail": "Verzió: {version}\nFejlesztő: {developer}\nOrszág: Magyarország\nFejlesztői profil: {profile}\nProjekt: {project}\nLicenc: {license}\n\nNem hivatalos, könnyű asztali kliens Linuxra. A támogatott streaming szolgáltatások hivatalos weblejátszóit jeleníti meg egy külön Chromium-környezetben, Widevine-támogatással.\n\nNem áll kapcsolatban egyetlen streaming szolgáltatással vagy annak tulajdonosával, és azok nem támogatják, nem szponzorálják. A Disney+ és a Netflix a tulajdonosuk védjegye. A választott szolgáltatás érvényes előfizetése szükséges.",
+      "developerProfile": "Fejlesztői profil",
+      "projectPage": "Projektoldal"
     },
     "updates": {
       "title": "Frissítések",
@@ -81,6 +92,14 @@
     "heading": "Válassz streaming szolgáltatást",
     "subtitle": "A Veylo a választott szolgáltatás hivatalos weblejátszóját nyitja meg.",
     "lastUsed": "Legutóbb használt",
+    "arrange": "Rendezés",
+    "finishArrange": "Kész – mentés",
+    "favorite": "Kedvenc ki/be",
+    "moveEarlier": "Előrébb helyezés",
+    "moveLater": "Hátrébb helyezés",
+    "unavailable": "A régiódban nem érhető el",
+    "unknownRegion": "Ismeretlen régió",
+    "hideUnavailable": "A régiómban nem elérhető szolgáltatások elrejtése",
     "autoOpen": "A szolgáltatás automatikus megnyitása indításkor",
     "hint": "Ezt bármikor módosíthatod a Streaming szolgáltatás menüben."
   },

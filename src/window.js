@@ -74,7 +74,7 @@ class MainWindow {
     this.window.webContents.on('did-finish-load', push);
   }
 
-  create() {
+  create({ displayId } = {}) {
     const { partition } = this.service;
 
     // Presents the client to this service as Chrome on its expected platform
@@ -84,7 +84,7 @@ class MainWindow {
     applyUserAgent(partition, this.service.identity);
     applyPermissionPolicy(session.fromPartition(partition));
 
-    const restored = loadWindowState();
+    const restored = loadWindowState(undefined, displayId);
     this.restored = restored;
 
     this.window = new BrowserWindow({

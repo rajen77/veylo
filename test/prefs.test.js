@@ -37,7 +37,7 @@ function writePrefs(name, value) {
 describe('prefs', () => {
   it('returns the defaults when the file does not exist', () => {
     const prefs = load(path.join(tmpDir, 'missing.json'));
-    assert.deepEqual(prefs, { lastServiceId: 'disneyplus', autoOpen: false, language: 'auto' });
+    assert.deepEqual(prefs, { lastServiceId: 'disneyplus', autoOpen: false, language: 'auto', favorites: [], serviceOrder: [], hideUnavailable: false });
   });
 
   it('rejects an unknown service id and an empty language', () => {
@@ -56,13 +56,24 @@ describe('prefs', () => {
     const file = path.join(tmpDir, 'corrupt.json');
     fs.writeFileSync(file, '{not json');
     const prefs = load(file);
-    assert.deepEqual(prefs, { lastServiceId: 'disneyplus', autoOpen: false, language: 'auto' });
+    assert.deepEqual(prefs, { lastServiceId: 'disneyplus', autoOpen: false, language: 'auto', favorites: [], serviceOrder: [], hideUnavailable: false });
   });
 
   it('round-trips valid values', () => {
     const file = path.join(tmpDir, 'roundtrip.json');
-    const prefs = { lastServiceId: 'netflix', autoOpen: true, language: 'hu' };
+    const prefs = { lastServiceId: 'netflix', autoOpen: true, language: 'hu', favorites: ['plex'], serviceOrder: ['plex', 'netflix'], hideUnavailable: true };
     save(prefs, file);
     assert.deepEqual(load(file), prefs);
+  });
+
+  it('ignores removed and duplicate services in saved arrangements', () => {
+    const file = writePrefs('arrangement.json', {
+      favorites: ['plex', 'removed', 'plex', 1],
+      serviceOrder: ['netflix', 'removed', 'netflix', 'plex'],
+    });
+    const prefs = load(file);
+    assert.deepEqual(prefs.favorites, ['plex']);
+    assert.deepEqual(prefs.serviceOrder, ['netflix', 'plex']);
+    assert.equal(prefs.hideUnavailable, false);
   });
 });

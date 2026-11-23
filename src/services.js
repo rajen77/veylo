@@ -422,10 +422,9 @@ function resolveService(id) {
 /**
  * Whether the service streams in the given country.
  *
- * A service without an `availableIn` list is offered everywhere. A restricted
- * one is offered only in its own countries — and never when the country is
- * unknown, because presenting it would only lead to the service's location
- * screen (see src/region.js).
+ * A service without an `availableIn` list is treated as available everywhere.
+ * A restricted service returns false for an unknown country; callers should
+ * distinguish unknown from confirmed unavailability when displaying it.
  *
  * @param {object} service
  * @param {string|null} country ISO 3166-1 alpha-2 code, or null when unknown
@@ -441,6 +440,33 @@ function visibleServices(country) {
   return SERVICES.filter((service) => availableInRegion(service, country));
 }
 
+/** Ordered services, with favourites first and optional regional hiding. */
+function orderedServices(prefs, country) {
+  const order = new Map((prefs.serviceOrder || []).map((id, index) => [id, index]));
+  const favorites = new Set(prefs.favorites || []);
+  return SERVICES
+    .filter((service) => !prefs.hideUnavailable || availableInRegion(service, country))
+    .map((service, index) => ({ service, index }))
+    .sort((a, b) => Number(favorites.has(b.service.id)) - Number(favorites.has(a.service.id)) ||
+      (order.get(a.service.id) ?? Infinity) - (order.get(b.service.id) ?? Infinity) ||
+      a.index - b.index)
+    .map(({ service }) => service);
+}
+
+function moveService(prefs, country, id, direction) {
+  const favorites = new Set(prefs.favorites);
+  const group = orderedServices(prefs, country)
+    .filter((service) => favorites.has(service.id) === favorites.has(id));
+  const index = group.findIndex((service) => service.id === id);
+  const target = group[index + direction];
+  if (index < 0 || !target || ![-1, 1].includes(direction)) return prefs;
+  const order = orderedServices({ ...prefs, hideUnavailable: false }, country).map((service) => service.id);
+  const from = order.indexOf(id);
+  const to = order.indexOf(target.id);
+  [order[from], order[to]] = [order[to], order[from]];
+  return { ...prefs, serviceOrder: order };
+}
+
 module.exports = {
   SERVICES,
   DEFAULT_SERVICE_ID,
@@ -450,4 +476,6 @@ module.exports = {
   resolveService,
   availableInRegion,
   visibleServices,
+  orderedServices,
+  moveService,
 };

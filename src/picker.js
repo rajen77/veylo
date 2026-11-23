@@ -6,6 +6,7 @@ const { app, BrowserWindow, ipcMain, nativeImage, screen } = require('electron')
 const log = require('./logger');
 const { t, language } = require('./i18n');
 const { computeLayout } = require('./picker-layout');
+const { availableInRegion, orderedServices, moveService } = require('./services');
 
 /**
  * The startup chooser: a small frameless window that asks which streaming
@@ -55,20 +56,22 @@ function escapeHtml(text) {
 /**
  * Reads the layout constants the chooser's window size is computed from:
  * the body's horizontal padding, the card size, the grid gap, how many cards
- * there are, and the grid's max-width (NaN when uncapped).
+ * there are, the grid's max-width, and the reserved scrollbar width.
  */
 const READ_CONSTANTS_SOURCE = `(() => {
   const el = document.querySelector('.cards');
-  if (!el || !el.firstElementChild) return null;
+  const visible = el && el.querySelectorAll('.tile:not([hidden])');
+  if (!visible || !visible.length) return null;
   const bodyStyle = getComputedStyle(document.body);
   const gridStyle = getComputedStyle(el);
   return {
     padL: parseFloat(bodyStyle.paddingLeft) || 0,
     padR: parseFloat(bodyStyle.paddingRight) || 0,
-    cardW: el.firstElementChild.offsetWidth,
+    cardW: visible[0].offsetWidth,
     gap: parseFloat(gridStyle.columnGap) || 0,
     cardCount: el.children.length,
     cap: parseFloat(gridStyle.maxWidth),
+    scrollbar: el.offsetWidth - el.clientWidth,
   };
 })()`;
 
@@ -83,7 +86,9 @@ const READ_CONSTANTS_SOURCE = `(() => {
  * (so it shrinks to the window and hides how tall the grid naturally is).
  * The script releases those constraints, lays the body out at the exact width
  * the window is about to get, and reads the body's own box — which includes
- * its padding and is independent of the window. Scrollbars are suppressed
+ * its padding and is independent of the window. All services and arrangement
+ * controls are temporarily shown so later changes do not require a resize.
+ * Scrollbars are suppressed
  * during the measurement: a vertical scrollbar would take width away from the
  * body, which can drop the grid a column and report a height for the wrong
  * layout. Everything is restored before it returns, so the page never paints
@@ -95,7 +100,11 @@ function heightSource(width) {
     if (!el) return null;
     const nodes = [document.documentElement, document.body, el];
     const saved = nodes.map((node) => node.getAttribute('style'));
+    const hidden = Array.from(el.querySelectorAll('.tile[hidden]'));
+    const wasEditing = el.classList.contains('editing');
     try {
+      hidden.forEach((tile) => { tile.hidden = false; });
+      el.classList.add('editing');
       document.documentElement.style.height = 'auto';
       document.documentElement.style.overflow = 'hidden';
       document.body.style.height = 'auto';
@@ -106,6 +115,8 @@ function heightSource(width) {
       el.style.overflow = 'visible';
       return Math.ceil(document.body.getBoundingClientRect().height);
     } finally {
+      hidden.forEach((tile) => { tile.hidden = true; });
+      if (!wasEditing) el.classList.remove('editing');
       nodes.forEach((node, i) => {
         if (saved[i] === null) node.removeAttribute('style');
         else node.setAttribute('style', saved[i]);
@@ -260,20 +271,39 @@ function writePage(html) {
   }
 }
 
-function buildHtml({ services, lastServiceId }) {
+function pickerState(prefs, country, editing = false) {
+  return {
+    order: orderedServices(prefs, country).map((service) => service.id),
+    favorites: prefs.favorites,
+    hideUnavailable: prefs.hideUnavailable,
+    editing,
+  };
+}
+
+function buildHtml({ services, lastServiceId, prefs, country }) {
   const cards = services
     .map((service) => {
       const icon = iconDataUrl(service.icon);
       const last = service.id === lastServiceId;
+      const restricted = !availableInRegion(service, country);
       return [
+        `<div class="tile" data-id="${service.id}">`,
         `<button class="card${last ? ' last' : ''}" type="button" data-id="${service.id}">`,
+        '<span class="favorite-mark" aria-hidden="true" hidden>★</span>',
         icon ? `<img src="${icon}" alt="">` : '',
         `<span class="name">${escapeHtml(service.name)}</span>`,
+        restricted ? `<span class="region">${escapeHtml(t(country ? 'picker.unavailable' : 'picker.unknownRegion'))}</span>` : '',
         last ? `<span class="badge">${escapeHtml(t('picker.lastUsed'))}</span>` : '',
         '</button>',
+        '<div class="card-actions">',
+        `<button type="button" data-action="favorite" aria-label="${escapeHtml(t('picker.favorite'))}: ${escapeHtml(service.name)}" aria-pressed="false">☆</button>`,
+        `<button type="button" data-action="left" aria-label="${escapeHtml(t('picker.moveEarlier'))}: ${escapeHtml(service.name)}">←</button>`,
+        `<button type="button" data-action="right" aria-label="${escapeHtml(t('picker.moveLater'))}: ${escapeHtml(service.name)}">→</button>`,
+        '</div></div>',
       ].join('');
     })
     .join('');
+  const initialState = JSON.stringify(pickerState(prefs, country)).replace(/</g, '\\u003c');
 
   return `<!doctype html>
 <html lang="${language()}">
@@ -297,8 +327,7 @@ function buildHtml({ services, lastServiceId }) {
   h1 { margin: 0; font-size: 16px; font-weight: 600; }
   .sub { margin: 4px 0 18px; font-size: 12.5px; color: #93a3ba; }
   /* Fixed-width grid tracks wrap into as many rows as needed, and the
-     max-width caps a row at four cards (4 tracks + 3 gaps) however wide the
-     window gets; narrower windows simply fit fewer per row. Rows and columns
+     max-width caps a row at seven cards. Rows and columns
      are centred so a partially filled last row stays balanced. The 'safe'
      keyword keeps the content reachable when the window is shrunk below one
      full screen. */
@@ -306,14 +335,16 @@ function buildHtml({ services, lastServiceId }) {
     display: grid; gap: var(--card-gap); flex: 1; min-height: 0;
     grid-template-columns: repeat(auto-fill, var(--card-w));
     justify-content: center; align-content: safe center;
-    margin: 0 auto; width: 100%; overflow: auto;
-    max-width: calc(4 * var(--card-w) + 3 * var(--card-gap));
+    margin: 0 auto; width: 100%; overflow: auto; scrollbar-gutter: stable; -webkit-app-region: no-drag;
+    max-width: calc(7 * var(--card-w) + 6 * var(--card-gap) + 20px);
   }
+  .tile { width: var(--card-w); display: flex; flex-direction: column; }
+  .tile[hidden] { display: none; }
   .card {
     -webkit-app-region: no-drag;
-    width: var(--card-w);
+    width: 100%; height: 200px; flex: none; position: relative;
     display: flex; flex-direction: column; align-items: center;
-    justify-content: center; gap: 10px; padding: 16px 10px; cursor: pointer;
+    justify-content: center; gap: 6px; padding: 12px 10px; cursor: pointer;
     background: #131c2e; border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 14px; color: inherit; font: inherit;
     transition: border-color 0.12s, background 0.12s, transform 0.12s;
@@ -322,18 +353,33 @@ function buildHtml({ services, lastServiceId }) {
   .card:focus-visible { outline: 2px solid #4ea1ff; outline-offset: 2px; }
   .card:active { transform: translateY(1px); }
   .card.last { border-color: rgba(78, 161, 255, 0.45); }
-  .card img { width: 64px; height: 64px; object-fit: contain; }
+  .card img { width: 64px; height: 64px; object-fit: contain; flex: none; }
+  .favorite-mark { position: absolute; right: 8px; top: 5px; color: #ffce80; }
   .card .name { font-size: 14px; font-weight: 600; }
   .card .badge {
     font-size: 10.5px; color: #7fb2ff; text-transform: uppercase;
     letter-spacing: 0.6px;
   }
+  .card .region { font-size: 11px; color: #ffce80; }
+  .card-actions { display: none; justify-content: center; gap: 8px; height: 34px; flex: none; padding-top: 4px; }
+  .cards.editing .card-actions { display: flex; }
+  .card-actions button {
+    background: #1d2b42; color: #e6ecf5; border: 0; border-radius: 5px;
+    min-width: 34px; cursor: pointer; font-size: 17px;
+  }
+  .card-actions button[aria-pressed="true"] { color: #ffce80; }
+  .card-actions button:disabled { opacity: 0.35; cursor: default; }
   .auto {
     -webkit-app-region: no-drag;
     display: flex; align-items: center; gap: 9px; margin-top: 16px;
     font-size: 12.5px; color: #b9c6d9; cursor: pointer;
   }
   .auto input { width: 15px; height: 15px; accent-color: #4ea1ff; cursor: pointer; }
+  .arrange {
+    -webkit-app-region: no-drag; align-self: flex-start; margin-top: 12px;
+    padding: 6px 12px; border: 1px solid #536883; border-radius: 6px;
+    background: #1d2b42; color: inherit; font: inherit; cursor: pointer;
+  }
   .hint { margin-top: 6px; font-size: 11px; color: #6d7d95; }
 </style>
 </head>
@@ -341,8 +387,14 @@ function buildHtml({ services, lastServiceId }) {
   <h1>${escapeHtml(t('picker.heading'))}</h1>
   <p class="sub">${escapeHtml(t('picker.subtitle'))}</p>
   <div class="cards">${cards}</div>
+  <button type="button" id="arrange" class="arrange" aria-pressed="false"
+    data-start="${escapeHtml(t('picker.arrange'))}" data-finish="${escapeHtml(t('picker.finishArrange'))}">${escapeHtml(t('picker.arrange'))}</button>
   <label class="auto">
-    <input type="checkbox" id="auto">
+    <input type="checkbox" id="hide-unavailable">
+    <span>${escapeHtml(t('picker.hideUnavailable'))}</span>
+  </label>
+  <label class="auto">
+    <input type="checkbox" id="auto"${prefs.autoOpen ? ' checked' : ''}>
     <span>${escapeHtml(t('picker.autoOpen'))}</span>
   </label>
   <div class="hint">${escapeHtml(t('picker.hint'))}</div>
@@ -350,17 +402,67 @@ function buildHtml({ services, lastServiceId }) {
     (function () {
       var api = window.veyloPicker;
       var auto = document.getElementById('auto');
-      var cards = document.querySelectorAll('.card');
-      for (var i = 0; i < cards.length; i++) {
-        cards[i].addEventListener('click', function (event) {
-          api.select(event.currentTarget.getAttribute('data-id'), auto.checked);
+      var grid = document.querySelector('.cards');
+      var hide = document.getElementById('hide-unavailable');
+      var arrange = document.getElementById('arrange');
+      var editing = false;
+      var tiles = Array.prototype.slice.call(document.querySelectorAll('.tile'));
+      function update(state) {
+        editing = state.editing;
+        grid.classList.toggle('editing', editing);
+        arrange.textContent = editing ? arrange.dataset.finish : arrange.dataset.start;
+        arrange.setAttribute('aria-pressed', String(editing));
+        hide.checked = state.hideUnavailable;
+        tiles.forEach(function (tile) {
+          var id = tile.dataset.id;
+          tile.hidden = state.order.indexOf(id) < 0;
+          var favorite = state.favorites.indexOf(id) >= 0;
+          tile.querySelector('.card').disabled = editing;
+          tile.querySelector('.favorite-mark').hidden = !favorite;
+          var star = tile.querySelector('[data-action="favorite"]');
+          star.textContent = favorite ? '★' : '☆';
+          star.setAttribute('aria-pressed', String(favorite));
+        });
+        state.order.forEach(function (id) {
+          var tile = tiles.find(function (item) { return item.dataset.id === id; });
+          if (tile) grid.appendChild(tile);
+        });
+        var visible = state.order.map(function (id) {
+          return tiles.find(function (tile) { return tile.dataset.id === id; });
+        }).filter(Boolean);
+        visible.forEach(function (tile, index) {
+          var favorite = state.favorites.indexOf(tile.dataset.id) >= 0;
+          var previous = visible[index - 1];
+          var next = visible[index + 1];
+          tile.querySelector('[data-action="left"]').disabled = !previous ||
+            (state.favorites.indexOf(previous.dataset.id) >= 0) !== favorite;
+          tile.querySelector('[data-action="right"]').disabled = !next ||
+            (state.favorites.indexOf(next.dataset.id) >= 0) !== favorite;
         });
       }
-      var preferred = document.querySelector('.card.last') || cards[0];
+      api.onState(update);
+      update(${initialState});
+      arrange.addEventListener('click', function () { api.change('edit'); });
+      hide.addEventListener('change', function () { api.change('hide', hide.checked); });
+      grid.addEventListener('click', function (event) {
+        var button = event.target.closest('button');
+        if (!button) return;
+        var tile = button.closest('.tile');
+        if (button.classList.contains('card')) api.select(tile.dataset.id, auto.checked);
+        else api.change(button.dataset.action, tile.dataset.id);
+      });
+      var preferred = document.querySelector('.tile:not([hidden]) .card.last') ||
+        document.querySelector('.tile:not([hidden]) .card');
       if (preferred) preferred.focus();
       document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape') { api.cancel(); return; }
-        var list = Array.prototype.slice.call(cards);
+        if (event.key === 'Escape') {
+          if (editing) api.change('edit');
+          else api.cancel();
+          return;
+        }
+        if (editing) return;
+        if (event.target.tagName === 'INPUT' || event.target.closest('.card-actions')) return;
+        var list = Array.prototype.slice.call(document.querySelectorAll('.tile:not([hidden]) .card'));
         var at = list.indexOf(document.activeElement);
         if (/^[1-9]$/.test(event.key)) {
           var byNumber = list[Number(event.key) - 1];
@@ -368,7 +470,7 @@ function buildHtml({ services, lastServiceId }) {
           return;
         }
         if (at < 0) return;
-        var perRow = list.filter(function (card) { return card.offsetTop === list[0].offsetTop; }).length || 1;
+        var perRow = list.filter(function (card) { return card.parentElement.offsetTop === list[0].parentElement.offsetTop; }).length || 1;
         var step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: perRow, ArrowUp: -perRow }[event.key];
         if (!step) return;
         var target = list[at + step];
@@ -389,14 +491,18 @@ function buildHtml({ services, lastServiceId }) {
  * @param {import('./services').SERVICES} options.services
  * @param {string} options.lastServiceId highlighted as "last used"
  */
-function pickService({ services, lastServiceId }) {
-  const html = buildHtml({ services, lastServiceId });
+function pickService({ services, lastServiceId, prefs, country, onChange, confirm, display, onClose }) {
+  let currentPrefs = prefs;
+  let draft = null;
+  const html = buildHtml({ services, lastServiceId, prefs, country });
 
   return new Promise((resolve) => {
     // Initial size only: once the page has loaded, fitToContent() grows the
     // window to the rows the current service list needs (clamped to the
     // display), so no fixed size has to be kept in step with SERVICES.
     const win = new BrowserWindow({
+      x: display.workArea.x + Math.max(0, Math.round((display.workArea.width - 700) / 2)),
+      y: display.workArea.y + Math.max(0, Math.round((display.workArea.height - 480) / 2)),
       width: 700,
       height: 480,
       minWidth: 420,
@@ -409,7 +515,6 @@ function pickService({ services, lastServiceId }) {
       maximizable: false,
       minimizable: false,
       fullscreenable: false,
-      center: true,
       autoHideMenuBar: true,
       webPreferences: {
         preload: path.join(__dirname, 'picker-preload.js'),
@@ -422,33 +527,89 @@ function pickService({ services, lastServiceId }) {
     });
 
     let settled = false;
+    function saveDraft() {
+      if (!draft) return;
+      currentPrefs = onChange('save', {
+        favorites: draft.favorites,
+        serviceOrder: draft.serviceOrder,
+      });
+      draft = null;
+    }
+
     const settle = (value) => {
       if (settled) return;
       settled = true;
+      const displayId = screen.getDisplayMatching(win.getBounds()).id;
+      onClose(displayId);
+      saveDraft();
       ipcMain.removeListener('picker:select', onSelect);
       ipcMain.removeListener('picker:cancel', onCancel);
+      ipcMain.removeListener('picker:change', onChangeRequest);
       win.removeAllListeners('closed');
       openWindow = null;
       if (!win.isDestroyed()) win.destroy();
-      resolve(value);
+      resolve(value ? { ...value, displayId } : null);
     };
 
-    function onSelect(_event, payload) {
+    let confirming = false;
+    async function onSelect(event, payload) {
+      if (event.sender !== win.webContents || confirming || draft) return;
       const id = payload && payload.id;
-      if (!services.some((service) => service.id === id)) {
+      const service = services.find((entry) => entry.id === id);
+      if (!service || !orderedServices(currentPrefs, country).some((entry) => entry.id === id)) {
         log.warn(`Picker sent an unknown service: ${id}`);
         return;
       }
-      settle({ id, autoOpen: Boolean(payload.autoOpen) });
+      confirming = true;
+      try {
+        if (await confirm(service, win) && !win.isDestroyed()) {
+          settle({ id, autoOpen: Boolean(payload.autoOpen) });
+        }
+      } catch (err) {
+        log.error('Could not confirm service selection:', err.message);
+      } finally {
+        confirming = false;
+      }
     }
 
-    function onCancel() {
+    function onCancel(event) {
+      if (event.sender !== win.webContents || confirming) return;
       settle(null);
+    }
+
+    function onChangeRequest(event, payload) {
+      if (event.sender !== win.webContents || !payload || typeof payload !== 'object') return;
+      const { action, id } = payload;
+      if (action === 'edit') {
+        if (draft) saveDraft();
+        else draft = { ...currentPrefs, favorites: [...currentPrefs.favorites], serviceOrder: [...currentPrefs.serviceOrder] };
+      } else if (action === 'hide') {
+        if (typeof id !== 'boolean') {
+          log.warn('Invalid picker visibility preference');
+          return;
+        }
+        currentPrefs = onChange(action, id);
+        if (draft) draft = { ...draft, hideUnavailable: currentPrefs.hideUnavailable };
+      } else if (draft && services.some((service) => service.id === id) && action === 'favorite') {
+        const favorites = new Set(draft.favorites);
+        if (favorites.has(id)) favorites.delete(id);
+        else favorites.add(id);
+        draft = { ...draft, favorites: [...favorites] };
+      } else if (draft && services.some((service) => service.id === id) && (action === 'left' || action === 'right')) {
+        draft = moveService(draft, country, id, action === 'left' ? -1 : 1);
+      } else {
+        log.warn(`Invalid picker preference action: ${action}`);
+      }
+      win.webContents.send('picker:state', pickerState(draft || currentPrefs, country, Boolean(draft)));
     }
 
     ipcMain.on('picker:select', onSelect);
     ipcMain.on('picker:cancel', onCancel);
-    win.on('closed', () => settle(null));
+    ipcMain.on('picker:change', onChangeRequest);
+    win.on('close', (event) => {
+      event.preventDefault();
+      settle(null);
+    });
 
     openWindow = win;
     const file = writePage(html);

@@ -6,6 +6,11 @@ const { isDebug } = log;
 const { VOLUME_STEP } = require('./playback');
 const { t, available: availableLanguages } = require('./i18n');
 
+const DEVELOPER_URL = 'https://github.com/rajen77';
+const PROJECT_URL = 'https://github.com/rajen77/veylo';
+// I, P and R are reserved for devtools, picture-in-picture and force reload.
+const SERVICE_LETTER_KEYS = 'ABCDEFGHJKLMNOQSTUVWXYZ';
+
 /**
  * Builds the application menu. On Linux this is the only place accelerators can
  * be registered globally, which is how playback shortcuts work even while the
@@ -19,9 +24,12 @@ function buildMenu({
   services = [],
   activeServiceId = '',
   autoOpen = false,
+  hideUnavailable = false,
   languagePref = 'auto',
   onSwitchService = () => {},
   onToggleAutoOpen = () => {},
+  onToggleHideUnavailable = () => {},
+  onOpenPicker = () => {},
   onSetLanguage = () => {},
 }) {
   const send = (command) => () => media.emit(command);
@@ -54,15 +62,29 @@ function buildMenu({
   template.push({
     label: t('menu.service.title'),
     submenu: [
+      ...(!services.some((service) => service.id === activeServiceId)
+        ? [{ type: 'radio', visible: false, checked: true }]
+        : []),
       ...services.map((service, index) => ({
         id: `service-${service.id}`,
-        label: service.name,
+        label: service.unavailable ? `${service.name} (${t(service.unknownRegion ? 'picker.unknownRegion' : 'picker.unavailable')})` : service.name,
         type: 'radio',
         checked: service.id === activeServiceId,
-        ...(index < 9 ? { accelerator: `CommandOrControl+${index + 1}` } : {}),
+        ...(index < 9
+          ? { accelerator: `CommandOrControl+Shift+${index + 1}` }
+          : SERVICE_LETTER_KEYS[index - 9]
+            ? { accelerator: `CommandOrControl+Shift+${SERVICE_LETTER_KEYS[index - 9]}` }
+            : {}),
         click: () => onSwitchService(service.id),
       })),
       { type: 'separator' },
+      { label: t('menu.service.manage'), click: () => onOpenPicker() },
+      {
+        label: t('picker.hideUnavailable'),
+        type: 'checkbox',
+        checked: hideUnavailable,
+        click: () => onToggleHideUnavailable(),
+      },
       {
         id: 'service-auto-open',
         label: t('menu.service.autoOpen'),
@@ -189,14 +211,31 @@ function buildMenu({
       { type: 'separator' },
       {
         label: t('menu.help.about'),
-        click: () => {
-          dialog.showMessageBox(window.window, {
+        click: async () => {
+          const { response } = await dialog.showMessageBox(window.window, {
             type: 'info',
             title: t('dialogs.about.title'),
             message: 'Veylo',
-            detail: t('dialogs.about.detail', { version: app.getVersion() }),
-            buttons: [t('menu.ok')],
+            detail: t('dialogs.about.detail', {
+              version: app.getVersion(),
+              developer: 'Szabó Kornél',
+              profile: DEVELOPER_URL,
+              project: PROJECT_URL,
+              license: 'MIT',
+            }),
+            buttons: [t('menu.ok'), t('dialogs.about.developerProfile'), t('dialogs.about.projectPage')],
+            defaultId: 0,
+            cancelId: 0,
+            noLink: true,
           });
+          const url = [null, DEVELOPER_URL, PROJECT_URL][response];
+          if (url) {
+            try {
+              await shell.openExternal(url);
+            } catch (err) {
+              log.error('Could not open About link:', err.message);
+            }
+          }
         },
       },
     ],
