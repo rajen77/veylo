@@ -10,6 +10,9 @@ const path = require('node:path');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'veylo-picker-test-'));
 const ipcMain = new EventEmitter();
 let window;
+const opened = [];
+const errors = [];
+let failOpen = false;
 class FakeWindow extends EventEmitter {
   constructor(options) {
     super();
@@ -39,6 +42,11 @@ require.cache[electronPath] = {
     app: { getPath: () => dir },
     BrowserWindow: FakeWindow,
     ipcMain,
+    shell: { async openExternal(url) {
+      if (failOpen) throw new Error('browser unavailable');
+      opened.push(url);
+    } },
+    dialog: { showErrorBox: (title, message) => errors.push({ title, message }) },
     nativeImage: {
       createFromPath: () => ({
         isEmpty: () => false,
@@ -144,6 +152,7 @@ it('saves the current display when the chooser is cancelled or closed', async ()
       onChange: () => {},
       onClose: (displayId) => closed.push(displayId),
     });
+
     window.bounds.x = 2200;
     if (nativeClose) {
       let prevented = false;
@@ -155,4 +164,34 @@ it('saves the current display when the chooser is cancelled or closed', async ()
     assert.equal(await result, null);
     assert.deepEqual(closed, [2]);
   }
+});
+
+it('opens only the fixed support page from the chooser and reports browser failures', async () => {
+  const result = pickService({
+    services: SERVICES,
+    lastServiceId: 'netflix',
+    prefs: { favorites: [], serviceOrder: [], hideUnavailable: false, autoOpen: false },
+    country: 'HU',
+    display: { workArea: { x: 0, y: 0, width: 1920, height: 1080 } },
+    confirm: async () => true,
+    onChange: () => {},
+    onClose: () => {},
+  });
+  const html = fs.readFileSync(path.join(dir, 'picker.html'), 'utf8');
+  assert.ok(html.includes('id="support"'));
+  ipcMain.emit('picker:support', { sender: {} }, 'https://example.com');
+  assert.deepEqual(opened, []);
+  ipcMain.emit('picker:support', { sender: window.webContents }, 'https://example.com');
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(opened, ['https://www.patreon.com/cw/rajen77']);
+  assert.equal(window.destroyed, false);
+  failOpen = true;
+  ipcMain.emit('picker:support', { sender: window.webContents });
+  await new Promise((resolve) => setImmediate(resolve));
+  failOpen = false;
+  assert.equal(errors.length, 1);
+  assert.ok(errors[0].message);
+  ipcMain.emit('picker:cancel', { sender: window.webContents });
+  await result;
+  assert.equal(ipcMain.listenerCount('picker:support'), 0);
 });

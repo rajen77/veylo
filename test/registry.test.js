@@ -183,8 +183,6 @@ describe('regional availability', () => {
   it('keeps the registry order and filters per country', () => {
     const restricted = SERVICES.filter((s) => s.availableIn).map((s) => s.id);
 
-    // The US gets every service: Peacock and the free services are US-first,
-    // SkyShowtime is the only one that is not offered there.
     const us = visibleServices('US').map((service) => service.id);
     assert.deepEqual(
       us,
@@ -193,8 +191,6 @@ describe('regional availability', () => {
     assert.ok(us.includes('peacock'));
     assert.ok(us.includes('plutotv'));
 
-    // Hungary: Paramount+ and SkyShowtime are offered, the US-only and
-    // EU-excluded ones are not.
     const hu = visibleServices('HU').map((service) => service.id);
     assert.ok(hu.includes('paramountplus'));
     assert.ok(hu.includes('skyshowtime'));
@@ -203,7 +199,6 @@ describe('regional availability', () => {
     assert.ok(!hu.includes('tubi'));
     assert.ok(hu.length < SERVICES.length);
 
-    // Every restricted service is hidden somewhere, so the lists are real.
     for (const id of restricted) {
       assert.ok(!visibleServices('ZZ').some((s) => s.id === id), id);
     }

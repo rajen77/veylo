@@ -5,51 +5,20 @@ const path = require('node:path');
 const { app } = require('electron');
 const log = require('./logger');
 
-/**
- * `screen` is only usable once the app is ready, and this module is required
- * while the main process is still loading, so it is fetched on demand rather
- * than destructured at the top level.
- */
+// Electron's screen API is unavailable until the app is ready.
 function getScreen() {
   return require('electron').screen;
 }
 
-/**
- * Remembers how the window was left: windowed, maximized or fullscreen, the
- * position and size it had in windowed mode, and which display it was on.
- *
- * Two Electron behaviours make this less direct than it looks, both measured
- * against the castLabs Electron 44 build used here:
- *
- *  - `getBounds()` is useless for persistence. Entering fullscreen or maximizing
- *    rewrites it, and a saved position is snapped back to the origin, so a
- *    window left at x=2231 on a second display is restored on the primary one.
- *    `getNormalBounds()` keeps the pre-maximize/pre-fullscreen bounds, so that
- *    is what gets stored.
- *  - The display has to be remembered explicitly. Centres are ambiguous on
- *    layouts where one display's bounds start at a negative coordinate, and the
- *    compositor moves a window that it considers off-screen.
- */
-
 const FILE_NAME = 'window-state.json';
 const DEFAULTS = { width: 1280, height: 800 };
 
-// Bounds are only honoured by the window manager when the window is still at
-// least partially visible, so a stored position always gets clamped into the
-// work area of its display.
+// Keep enough of the window visible for the window manager and user.
 const MIN_VISIBLE_PX = 80;
 
-// A display that was unplugged, a resolution change, or a corrupt file must not
-// produce a window that cannot be dragged back.
 const MIN_SIZE = { width: 480, height: 360 };
 
-// A window manager is free to round a requested geometry, and the frameless
-// setup here gets a scale factor that is not a whole number (0.921875 on the
-// machine this was developed against), so a stored size is handed back slightly
-// different from the one that was asked for. Saving that reading again would
-// compound the difference: measured over six maximize cycles it grew the window
-// by 2x1 px each time, without ever converging. A change this small is therefore
-// treated as the window manager's rounding and not as the user resizing.
+// Ignore window-manager rounding to prevent geometry drift across restarts.
 const GEOMETRY_EPSILON = 8;
 
 const MODES = ['normal', 'maximized', 'fullscreen'];
@@ -66,7 +35,6 @@ function isRectangle(value) {
   );
 }
 
-/** True when two rectangles differ by no more than the rounding allowance. */
 function isSameWithinRounding(a, b) {
   if (!a || !b) return false;
   return ['x', 'y', 'width', 'height'].every((key) => Math.abs(a[key] - b[key]) <= GEOMETRY_EPSILON);
@@ -77,14 +45,11 @@ function displayById(id) {
   return getScreen().getAllDisplays().find((display) => display.id === id) || null;
 }
 
-/** Clamp stored bounds into a display's work area, preserving size where possible. */
 function clampToDisplay(bounds, display) {
   const area = display.workArea;
   const width = Math.max(MIN_SIZE.width, Math.min(Math.round(bounds.width), area.width));
   const height = Math.max(MIN_SIZE.height, Math.min(Math.round(bounds.height), area.height));
 
-  // Leave a strip of the titlebar reachable instead of allowing a fully
-  // off-screen window.
   const minX = area.x - width + MIN_VISIBLE_PX;
   const maxX = area.x + area.width - MIN_VISIBLE_PX;
   const minY = area.y;
@@ -98,11 +63,6 @@ function clampToDisplay(bounds, display) {
   };
 }
 
-/**
- * Reads the stored state. The returned bounds are always usable: an unknown or
- * removed display falls back to the primary one, and unusable geometry is
- * discarded in favour of the defaults.
- */
 function load(storedFile = stateFile(), preferredDisplayId = null) {
   const screen = getScreen();
   try {
@@ -113,7 +73,7 @@ function load(storedFile = stateFile(), preferredDisplayId = null) {
 
     let bounds = isRectangle(raw.bounds) ? raw.bounds : null;
     if (!bounds && isRectangle(raw)) {
-      // Tolerate an older or hand-edited file that stored the keys flat.
+      // Preserve compatibility with older flat state files.
       bounds = { x: raw.x, y: raw.y, width: raw.width, height: raw.height };
     }
     if (!bounds) {
@@ -128,9 +88,7 @@ function load(storedFile = stateFile(), preferredDisplayId = null) {
     const area = display.workArea;
     const overlaps = bounds.x < area.x + area.width && bounds.x + bounds.width > area.x &&
       bounds.y < area.y + area.height && bounds.y + bounds.height > area.y;
-    // The windowed bounds can belong to a different display when the user
-    // moves a maximized/fullscreen window; an 80px strip is not enough to make
-    // the window manager maximize it on the intended display.
+    // Maximized windows need most of their normal bounds on the target display.
     if (!overlaps || screen.getDisplayMatching(bounds).id !== display.id) {
       bounds = clampToDisplay(bounds, display);
       bounds = {
@@ -170,18 +128,11 @@ function writeState(file, state) {
   }
 }
 
-/** Remember the chooser's display without changing the player's mode or size. */
 function saveDisplay(displayId, storedFile = stateFile()) {
   writeState(storedFile, load(storedFile, displayId));
 }
 
-/**
- * Watches a window and writes its state on every transition that changes it.
- *
- * Capturing the state from events rather than at exit is deliberate: a crash, a
- * SIGKILL or a session logout never reaches a save-on-quit path, and the
- * maximized/fullscreen transitions are exactly the moments the value changes.
- */
+// Save during the session as well as on close, which may not run after a crash.
 class WindowStateKeeper {
   /**
    * @param {import('electron').BrowserWindow} win
@@ -206,8 +157,6 @@ class WindowStateKeeper {
       win.on(event, () => this.scheduleSave());
     }
 
-    // Entering a mode leaves the windowed geometry untouched, so the mode is
-    // recorded at once while the geometry stays as it was.
     for (const event of ['maximize', 'enter-full-screen']) {
       win.on(event, () => {
         this.mode = this.currentMode();
@@ -215,12 +164,7 @@ class WindowStateKeeper {
       });
     }
 
-    // Coming back is different: the window manager is still animating it into
-    // its restored rectangle when the event arrives, and a reading taken then is
-    // a blend of the two states (measured: unmaximizing recorded 1284x1067 for a
-    // window whose real size is 1284x805). The mode is written immediately so
-    // that a crash cannot lose it, and the geometry is re-read once the window
-    // has settled.
+    // Restore events can precede the final window-manager geometry.
     for (const event of ['unmaximize', 'leave-full-screen']) {
       win.on(event, () => {
         this.mode = this.currentMode();
@@ -229,10 +173,6 @@ class WindowStateKeeper {
       });
     }
 
-    // A window can be dragged to another display without being maximized or
-    // resized, and that is precisely the case that used to be forgotten. The
-    // 'moved' event only fires once the move has settled; 'move' updates the
-    // display in the meantime so that a quit during a drag still records it.
     win.on('moved', () => {
       this.rememberDisplay();
       this.scheduleSave();
@@ -242,9 +182,7 @@ class WindowStateKeeper {
   currentMode() {
     const win = this.window;
     if (win.isDestroyed()) return this.mode;
-    // A minimized window reports neither maximized nor fullscreen, so asking it
-    // for its mode would silently downgrade a maximized window to 'normal' and
-    // then record the maximized rectangle as the windowed geometry.
+    // Minimized windows do not report their previous mode reliably.
     if (win.isMinimized()) return this.mode;
     if (win.isFullScreen()) return 'fullscreen';
     if (win.isMaximized()) return 'maximized';
@@ -264,7 +202,6 @@ class WindowStateKeeper {
     }
   }
 
-  /** Snapshot the geometry that matters, from the sources that actually hold it. */
   capture() {
     const win = this.window;
     if (!win || win.isDestroyed() || win.isMinimized()) return;
@@ -272,15 +209,9 @@ class WindowStateKeeper {
     this.mode = this.currentMode();
     this.rememberDisplay();
 
-    // Only a windowed window reports its windowed geometry. While maximized or
-    // fullscreen, getNormalBounds() reports the maximized rect on this build
-    // (measured: a window restored maximized at 900x640 reported 1792x1067), so
-    // capturing then would overwrite the size to return to with the size it is
-    // already filling. The seeded value is kept instead.
+    // This Electron build can report fullscreen bounds as normal bounds.
     if (this.mode !== 'normal') return;
 
-    // getNormalBounds is the only accessor that still reports the windowed
-    // geometry while maximized or fullscreen.
     let best = null;
     try {
       const normal = win.getNormalBounds();
@@ -296,21 +227,11 @@ class WindowStateKeeper {
       best = current;
     }
 
-    // A reading that only differs by the window manager's rounding is not a
-    // resize, so the stored geometry is left alone rather than accumulated.
     if (this.bounds && isSameWithinRounding(this.bounds, best)) return;
     this.bounds = best;
   }
 
-  /**
-   * Rejects a reading that cannot be the windowed geometry.
-   *
-   * A windowed window never fills a display, panels and all, so a rectangle that
-   * matches one exactly is a fullscreen or maximized rectangle seen mid-restore.
-   * The height is checked specifically because the transition that leaks it is
-   * vertical: the width is already back to the windowed value while the height
-   * is still on its way down.
-   */
+  // Filter fullscreen-sized and intermediate restore geometry.
   plausible(rect) {
     const displays = getScreen().getAllDisplays();
     const height = displays.some((display) => Math.abs(rect.height - display.bounds.height) <= 2);
@@ -325,7 +246,6 @@ class WindowStateKeeper {
     });
   }
 
-  /** Re-read the geometry once the window has finished being restored. */
   settle() {
     if (this.settleTimer) clearTimeout(this.settleTimer);
     this.settleTimer = setTimeout(() => {
@@ -335,7 +255,7 @@ class WindowStateKeeper {
     }, 600);
   }
 
-  /** Coalesce drag/zoom storms into one write. */
+  // Coalesce rapid window-manager events.
   scheduleSave() {
     if (this.saveTimer) return;
     this.saveTimer = setTimeout(() => {
@@ -349,8 +269,7 @@ class WindowStateKeeper {
     const win = this.window;
     if (!win || win.isDestroyed()) return;
     if (!this.bounds) this.capture();
-    // Nothing to record if the window has never been windowed and no state was
-    // seeded; writing null bounds would lose the position entirely.
+    // Do not overwrite usable state with null geometry.
     if (!this.bounds) return;
 
     const state = {
@@ -361,7 +280,6 @@ class WindowStateKeeper {
     writeState(this.file, state);
   }
 
-  /** Flush a pending debounce before the process exits. */
   flush() {
     const settling = Boolean(this.settleTimer);
     if (this.saveTimer) {

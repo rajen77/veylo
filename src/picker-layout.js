@@ -2,12 +2,6 @@
 
 const MIN_WIDTH = 420;
 
-/**
- * Column count and window width for the service chooser, from the layout
- * constants the page reports and the display's work area. A row holds as many
- * cards as the grid's max-width allows (NaN when uncapped), as fit on the
- * display, and as there are services.
- */
 function computeLayout(constants, workArea) {
   const { padL, padR, cardW, gap, cardCount, cap, scrollbar = 0 } = constants;
   const capCols = Number.isFinite(cap)

@@ -2,19 +2,10 @@
 
 const { ipcRenderer } = require('electron');
 
-/**
- * The renderer is an official streaming service's web app (Disney+, Netflix,
- * …), which is untrusted code as far as this client is concerned. The preload
- * therefore exposes no API to the page and only forwards playback state
- * outward through IPC.
- *
- * Playback control in the opposite direction is done by driving the existing
- * media element and the player's own buttons, exactly as a user would.
- */
+// Service pages are untrusted; do not expose the IPC API to them.
 
 const POLL_INTERVAL_MS = 1000;
-// The shift pass walks the whole DOM, so it is not run on the fast poll; see
-// startTitlebar() for the events that drive it and this safety-net interval.
+// The offset pass walks the DOM, so it runs less often than media polling.
 const OFFSET_POLL_MS = 5000;
 // Coalesces bursts of DOM mutations into one media scan.
 const SCAN_DEBOUNCE_MS = 250;
@@ -32,8 +23,7 @@ let lastPushAt = 0;
 
 function activeMedia() {
   const videos = Array.from(document.querySelectorAll('video'));
-  // The main feature is always the largest element on screen; trailers and
-  // background previews are small.
+  // Prefer the main player over smaller trailers and previews.
   const video = videos.reduce((best, v) => {
     const area = (v.clientWidth || 0) * (v.clientHeight || 0);
     const bestArea = best ? (best.clientWidth || 0) * (best.clientHeight || 0) : -1;
@@ -45,9 +35,7 @@ function activeMedia() {
   return video || playingAudio || audio.find((element) => !element.ended) || audio[0] || null;
 }
 
-// The suffix pattern depends only on the service name, and readTitle() runs on
-// every poll and title event; compiling it once per service instead of once per
-// call keeps that path free of RegExp construction.
+// Cache the suffix pattern because titles are read on every poll.
 let titleSuffixFor = null;
 let titleSuffixPattern = null;
 
@@ -63,13 +51,7 @@ function titleSuffixRe(service) {
 }
 
 function readTitle() {
-  // The player renders the title in the document title while something plays,
-  // e.g. "Title | Disney+" or "Title on Netflix". The service name is whatever
-  // the main process reports for the active service (see src/services.js), so
-  // this stays correct when the window is pointed at another service.
   const service = window.__veyloService || '';
-  // The suffix the site appends varies: "Title | Disney+", "Title - Netflix",
-  // "Title on Netflix". Anything left after stripping it is the real title.
   const fromDocument = service
     ? document.title.replace(titleSuffixRe(service), '').trim()
     : document.title.trim();
@@ -109,12 +91,7 @@ function snapshot() {
   };
 }
 
-/**
- * State changes that must reach the main process without waiting: they drive
- * the tray, the window title and MPRIS status. Position and duration are not
- * on the list — they move continuously during playback and are rate-limited
- * below instead.
- */
+// Position updates can be throttled; visible state changes cannot.
 function isImmediateChange(next, prev) {
   if (!prev) return true;
   return next.hasVideo !== prev.hasVideo
@@ -135,16 +112,7 @@ function sendState(state, now) {
   ipcRenderer.send('media:state', state);
 }
 
-/**
- * Sends the playback state, at most once per second for pure position updates.
- *
- * `timeupdate` fires about four times a second and the one-second poll adds
- * more; without this every tick became an IPC round trip plus a metadata
- * rebuild in the main process even when nothing visible had changed. MPRIS
- * interpolates the position between updates (see src/mpris.js), so one sample
- * per second loses nothing, while play/pause/volume/title changes still go out
- * immediately.
- */
+// Limit frequent timeupdate IPC; MPRIS interpolates between samples.
 function push() {
   const state = snapshot();
   const now = Date.now();
@@ -178,10 +146,7 @@ function scan() {
   if (media && !changed) push();
 }
 
-/**
- * The page mutates constantly; scanning (and pushing) on every batch would
- * flood the main process. Coalesce the bursts into one pass.
- */
+// Coalesce frequent page mutations to avoid flooding IPC.
 function scheduleScan() {
   if (scanTimer) return;
   scanTimer = window.setTimeout(() => {
@@ -190,7 +155,6 @@ function scheduleScan() {
   }, SCAN_DEBOUNCE_MS);
 }
 
-/** Click a player button by its accessible name, e.g. "Next episode". */
 function clickByLabel(patterns) {
   const candidates = document.querySelectorAll('button, [role="button"], a[role="button"]');
   for (const node of candidates) {
@@ -210,10 +174,18 @@ function clickByLabel(patterns) {
   return false;
 }
 
+function playMedia(media) {
+  media.play().catch((err) => {
+    if (!clickByLabel(['play', 'lejátszás'])) {
+      console.warn('[veylo] play failed', err && err.message);
+    }
+  });
+}
+
 const COMMANDS = {
   play() {
     const video = activeMedia();
-    if (video && video.paused) video.play().catch(() => clickByLabel(['play', 'lejátszás']));
+    if (video && video.paused) playMedia(video);
   },
   pause() {
     const video = activeMedia();
@@ -225,7 +197,7 @@ const COMMANDS = {
       clickByLabel(['play', 'lejátszás']);
       return;
     }
-    if (video.paused) video.play().catch(() => {});
+    if (video.paused) playMedia(video);
     else video.pause();
   },
   next() {
@@ -284,17 +256,7 @@ const COMMANDS = {
   },
 };
 
-/* ------------------------------------------------------------------ *
- * Window controls
- *
- * The window is frameless, so these are its title bar. They are built as
- * ordinary DOM in the page because that is the only layer that receives input
- * here; see src/titlebar.js for the two native alternatives that were measured
- * and rejected.
- *
- * This code has to stay in this file: a sandboxed preload cannot `require` a
- * relative path, so a helper module would not load.
- * ------------------------------------------------------------------ */
+// A sandboxed preload cannot require local modules; the title bar must stay here.
 
 const TITLEBAR_ID = 'veylo-titlebar';
 const TITLEBAR_HEIGHT = 36;
@@ -307,9 +269,7 @@ const TITLEBAR_BUTTONS = [
   { id: 'close', channel: 'window:titlebar:close', danger: true },
 ];
 
-// The control labels in English. The main process replaces the whole set
-// through 'veylo:titlebar-labels' before the first load: the translations live
-// in locales/*.json and this preload is sandboxed, so it cannot read them.
+// The sandboxed preload receives translated labels from the main process.
 let titlebarLabels = {
   menu: 'Menu',
   fullscreen: 'Fullscreen',
@@ -355,14 +315,8 @@ const TITLEBAR_STYLES = `
 #${TITLEBAR_ID} .veylo-titlebar-button:active { background: rgba(255, 255, 255, 0.2); }
 #${TITLEBAR_ID} .veylo-titlebar-button:focus-visible { outline: 2px solid #4ea1ff; outline-offset: -2px; }
 #${TITLEBAR_ID} .veylo-titlebar-button[data-danger="true"]:hover { background: #c0392b; }
-/* The strip is fixed, so it is out of the flow and would sit on top of the
-   page's own header. The page is pushed down by the strip's height instead.
-   Only the root element is padded: the body's box already starts below the
-   root's padding, so padding it too would double the offset.
-
-   That padding only reaches static content. Headers the page pins to the
-   viewport (fixed, or sticky once it sticks) ignore it and stay at the top
-   edge, behind the strip; applyTitlebarOffset() shifts those separately. */
+/* Root padding avoids overlap without doubling the body's offset.
+   Fixed and sticky headers need a separate shift. */
 html.veylo-titlebar-offset { padding-top: ${TITLEBAR_HEIGHT}px !important; }
 `;
 
@@ -377,11 +331,9 @@ html.veylo-titlebar-offset body > #plex {
 // Mirrors the main process; updated through window:titlebar-state.
 const titlebarState = { title: 'Veylo', maximized: false, fullscreen: false };
 
-// In fullscreen the strip is hidden, but it comes back when the pointer reaches
-// the top edge so that the window controls are never unreachable.
+// Reveal fullscreen controls at the top edge to keep them reachable.
 let titlebarRevealed = false;
 let titlebarRebuildTimer = null;
-// The strip's elements, kept so that they can be updated in place.
 let titlebarParts = null;
 
 function titlebarIcon(name) {
@@ -408,7 +360,6 @@ function setTitlebarIcon(button, name) {
   button.dataset.icon = name;
 }
 
-/** The label a control shows right now; two of them follow the window state. */
 function titlebarLabelFor(id) {
   if (id === 'fullscreen') {
     return titlebarState.fullscreen ? titlebarLabels.exitFullscreen : titlebarLabels.fullscreen;
@@ -419,25 +370,14 @@ function titlebarLabelFor(id) {
   return titlebarLabels[id] || id;
 }
 
-/**
- * The application menu is a native popup, so it is placed in window coordinates
- * rather than by the page. The anchor is measured here, where the layout is
- * known, and handed to the main process: without it the popup opens at a fixed
- * offset from the window's left edge instead of next to the button that asked
- * for it.
- */
+// Native menus need an anchor in window coordinates.
 function menuAnchor(element, point) {
   if (point) return { x: Math.round(point.x), y: Math.round(point.y) };
   const rect = element.getBoundingClientRect();
   return { x: Math.round(rect.left), y: Math.round(rect.bottom) };
 }
 
-/**
- * Creates the strip once. The elements are then updated in place rather than
- * rebuilt, because replacing a button between mousedown and mouseup means the
- * click never completes: the page mutates constantly, so a rebuild triggered by
- * the observer would otherwise swallow clicks at random.
- */
+// Updating buttons in place prevents mutations from swallowing clicks.
 function createTitlebar() {
   const bar = document.createElement('div');
   bar.id = TITLEBAR_ID;
@@ -473,16 +413,12 @@ function createTitlebar() {
     event.stopPropagation();
     const spec = TITLEBAR_BUTTONS.find((item) => item.id === button.dataset.action);
     if (!spec) return;
-    // The menu is a native popup, so it needs the button's position; the other
-    // commands are position-independent.
     if (spec.id === 'menu') {
       ipcRenderer.send(spec.channel, menuAnchor(button, event));
       return;
     }
     ipcRenderer.send(spec.channel);
   });
-  // Right-clicking the strip shows the application menu, which is where the
-  // accelerators, the update check and the About box already live.
   bar.addEventListener('contextmenu', (event) => {
     event.preventDefault();
     ipcRenderer.send('window:titlebar:menu', menuAnchor(bar, event));
@@ -491,23 +427,14 @@ function createTitlebar() {
   return { bar, caption, buttons };
 }
 
-// Viewport-anchored elements the strip would otherwise cover, mapped to the
-// inline declaration that was written to shift them.
 const shiftedElements = new Map();
 
-// Elements whose computed position is fixed or sticky — the only ones the
-// shift pass can act on. Finding them walks the whole body with
-// getComputedStyle, so the list is cached and only invalidated when the DOM
-// changes (the title-bar observer below) or on the slow safety-net poll, which
-// also picks up a position the page changed through a class toggle alone.
+// Cache fixed/sticky candidates to avoid repeated whole-DOM style scans.
 let offsetCandidates = null;
 
-/** Undoes every shift left behind by the previous pass. */
 function restoreShiftedElements() {
   for (const [element, shift] of shiftedElements) {
-    // Only undo the declaration while it is still ours. When the page has
-    // rewritten it in the meantime its value wins, and the next pass shifts
-    // whatever it wrote instead of resurrecting a stale value.
+    // Preserve changes made by the page since the last shift.
     if (element.style.getPropertyValue(shift.property) !== shift.applied) continue;
     if (shift.original === '') element.style.removeProperty(shift.property);
     else element.style.setProperty(shift.property, shift.original, shift.originalPriority);
@@ -515,40 +442,23 @@ function restoreShiftedElements() {
   shiftedElements.clear();
 }
 
-/** Moves one element down, remembering exactly how to undo it. */
 function shiftElement(element, property, value) {
   const original = element.style.getPropertyValue(property);
   const originalPriority = element.style.getPropertyPriority(property);
   element.style.setProperty(property, value, 'important');
   shiftedElements.set(element, {
     property,
-    // Read back rather than trusting `value`: the browser may normalise it,
-    // and the restore above compares against what is actually stored.
+    // The browser may normalize the value used by the restore comparison.
     applied: element.style.getPropertyValue(property),
     original,
     originalPriority,
   });
 }
 
-/**
- * Shifts viewport-anchored content clear of the strip.
- *
- * The root padding moves static content only: `position: fixed`, and a
- * `sticky` element once it sticks, are laid out against the viewport, so the
- * page's own navigation stays at the top edge and disappears behind the strip.
- * Those elements are moved down by the strip's height instead.
- *
- * Stacked headers are handled as a cascade. Moving the primary navigation
- * down pushes it into the sub-navigation below, which then has to move as
- * well; pulling elements in until nothing collides keeps their spacing.
- *
- * Runs after every rebuild: it first restores the previous pass, so the
- * selection always sees the page's own layout rather than last pass's result.
- */
+// Fixed/sticky headers ignore root padding; cascading shifts preserve stacked headers.
 function applyTitlebarOffset() {
   restoreShiftedElements();
 
-  // In fullscreen the strip is out of the layout, so nothing needs shifting.
   if (!document.documentElement.classList.contains('veylo-titlebar-offset')) return;
   const strip = document.getElementById(TITLEBAR_ID);
   if (!strip) return;
@@ -580,12 +490,10 @@ function applyTitlebarOffset() {
     if (Number.isFinite(zIndex) && zIndex < 0) continue; // page backdrops
     const rect = element.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) continue;
-    // Layers spanning the viewport (video backdrop, load curtain) are meant to
-    // sit behind the strip; shifting them would tear the layout apart.
+    // Viewport-sized backdrops belong behind the strip.
     if (rect.height >= viewportHeight * 0.9) continue;
 
-    // A sticky element reports its flow position until it sticks, so judge it
-    // by `top` as well: that is where it lands once scrolled to the edge.
+    // Sticky elements can later stick above their current flow position.
     let top = rect.top;
     if (position === 'sticky') {
       const stickyTop = Number.parseFloat(style.top);
@@ -616,22 +524,17 @@ function applyTitlebarOffset() {
     if (candidate.position === 'sticky') {
       const stickyTop = Number.parseFloat(style.top);
       if (Number.isFinite(stickyTop)) {
-        // `top` is ignored while the element is in flow and only decides where
-        // it sticks, so this moves it out from under the strip exactly when it
-        // would collide, without disturbing the layout as it scrolls past.
+        // Changing top affects the sticky position without moving the flow box.
         shiftElement(element, 'top', `${stickyTop + stripRect.height}px`);
         continue;
       }
     }
-    // A margin shifts a fixed element without touching `top`, which the page
-    // may be animating inline, and it keeps the height even when the page pins
-    // `bottom` as well. `calc` carries percentage margins through unchanged.
+    // Margin preserves animated top, bottom constraints and percentage margins.
     const margin = style.marginTop === 'auto' ? '0px' : style.marginTop || '0px';
     shiftElement(element, 'margin-top', `calc(${margin} + ${stripRect.height}px)`);
   }
 }
 
-/** Creates or refreshes the strip. Safe to call repeatedly. */
 function buildTitlebar() {
   const root = document.documentElement;
   const body = document.body;
@@ -651,8 +554,7 @@ function buildTitlebar() {
     titlebarParts = created;
     body.appendChild(bar);
   } else if (!titlebarParts || titlebarParts.bar !== bar) {
-    // The page replaced the strip with its own node of the same id; take it over
-    // rather than leaving a dead element behind.
+    // Replace a conflicting page node rather than leaving dead controls.
     bar.remove();
     const created = createTitlebar();
     bar = created.bar;
@@ -664,8 +566,6 @@ function buildTitlebar() {
   const text = titlebarState.title || 'Veylo';
   if (caption.textContent !== text) caption.textContent = text;
 
-  // The labels follow the active language and the window state, so they are
-  // re-applied on every refresh — including after a language change.
   for (const spec of TITLEBAR_BUTTONS) {
     const button = buttons.get(spec.id);
     if (!button) continue;
@@ -682,9 +582,6 @@ function buildTitlebar() {
   const maximizeButton = buttons.get('maximize');
   if (maximizeButton) setTitlebarIcon(maximizeButton, titlebarState.maximized ? 'restore' : 'maximize');
 
-  // In fullscreen the strip is hidden so the video fills the screen, and it is
-  // revealed again when the pointer reaches the top edge. Without that the
-  // fullscreen button would be the only control that could not be undone.
   const hidden = titlebarState.fullscreen && !titlebarRevealed;
   const display = hidden ? 'none' : 'flex';
   if (bar.style.display !== display) bar.style.display = display;
@@ -692,23 +589,17 @@ function buildTitlebar() {
     ? 'rgba(11, 18, 32, 0.92)'
     : '#0b1220';
 
-  // The page is given back the strip's height in fullscreen, and the strip is
-  // taken out of the layout there so it cannot cover the video.
   root.classList.toggle('veylo-titlebar-offset', !titlebarState.fullscreen);
   root.style.setProperty('--veylo-titlebar-height', `${TITLEBAR_HEIGHT}px`);
 
-  // Runs last so it sees the final class and the strip's final geometry; it
-  // restores the previous pass's shifts before measuring, as the page may have
-  // relaid everything out since.
+  // Measure only after the final strip geometry and offset class are applied.
   applyTitlebarOffset();
 }
 
-/** Coalesces the bursts of mutations a single page transition produces. */
 function scheduleTitlebarRebuild() {
   if (titlebarRebuildTimer) return;
   titlebarRebuildTimer = window.setTimeout(() => {
     titlebarRebuildTimer = null;
-    // The DOM changed, so the cached fixed/sticky candidates may have too.
     offsetCandidates = null;
     buildTitlebar();
   }, 250);
@@ -724,23 +615,17 @@ function startTitlebar() {
     buildTitlebar();
   });
 
-  // A single page app replaces large parts of the DOM without navigating, which
-  // can drop the strip; the observer restores it. Its own insertions are ignored
-  // so that it cannot feed itself.
+  // Restore controls removed by single-page navigation without observing our own insertion.
   const observer = new MutationObserver((records) => {
-    for (const record of records) {
-      for (const node of record.addedNodes) {
-        if (node instanceof Element && node.id === TITLEBAR_ID) return;
-      }
-    }
+    const onlyTitlebar = records.every((record) =>
+      record.removedNodes.length === 0 && record.addedNodes.length > 0 &&
+      Array.from(record.addedNodes).every((node) => node instanceof Element && node.id === TITLEBAR_ID));
+    if (onlyTitlebar) return;
     scheduleTitlebarRebuild();
   });
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
-  // Reveal the strip when the pointer reaches the top edge while fullscreen.
-  // The zone has hysteresis: it opens as soon as the pointer is over the strip
-  // and only closes once the pointer has moved well clear of it, otherwise
-  // moving down onto a button would hide the strip before the click landed.
+  // Hysteresis prevents the strip from hiding while a button is being clicked.
   document.addEventListener('mousemove', (event) => {
     if (!titlebarState.fullscreen) return;
     const y = event.clientY;
@@ -750,8 +635,6 @@ function startTitlebar() {
     buildTitlebar();
   }, { passive: true });
 
-  // Navigating back to the signed-out marketing pages also clears the window
-  // title; keep the strip's caption in step with it.
   const syncTitle = () => {
     const title = readTitle();
     if (title && title !== titlebarState.title) {
@@ -759,12 +642,7 @@ function startTitlebar() {
       buildTitlebar();
     }
   };
-  // The title is cheap to read (document.title plus one lookup), so it stays on
-  // the fast poll. The shift pass is not: it walks every element in the DOM
-  // with getComputedStyle, so it is driven by the events that can actually
-  // invalidate it — scrolling (captured, since scroll does not bubble) and
-  // resizing — plus a slow safety net for late-loading views that pin a header
-  // without any mutation for the observer to see.
+  // Capture scroll because it does not bubble; style scans use a slower poll.
   window.setInterval(syncTitle, POLL_INTERVAL_MS);
 
   let offsetTimer = null;
@@ -777,9 +655,7 @@ function startTitlebar() {
   };
   window.addEventListener('scroll', scheduleOffset, { passive: true, capture: true });
   window.addEventListener('resize', scheduleOffset, { passive: true });
-  // Safety net for late-loading views that pin a header without any mutation
-  // for the observer to see; it also refreshes the cached candidate list so a
-  // position changed through a class toggle alone is picked up.
+  // Class-only position changes do not trigger the child-list observer.
   window.setInterval(() => {
     offsetCandidates = null;
     applyTitlebarOffset();
@@ -790,9 +666,7 @@ function start() {
   scan();
   startTitlebar();
   pollTimer = window.setInterval(scan, POLL_INTERVAL_MS);
-  // The app is a single page that swaps views; a light observer catches videos
-  // that appear without a navigation event. Debounced: the page mutates
-  // constantly and an unthrottled scan would run several times a second.
+  // Single-page navigation can add media without a document navigation.
   const observer = new MutationObserver(() => scheduleScan());
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
@@ -812,14 +686,10 @@ function start() {
 
   ipcRenderer.on('media:request-state', push);
 
-  // The active service's display name, used by readTitle() to strip the site's
-  // own suffix from the document title. Sent before the first load.
   ipcRenderer.on('service:name', (_event, name) => {
     if (typeof name === 'string' && name) window.__veyloService = name;
   });
 
-  // The title-bar labels of the active language. Sent before the first load and
-  // again whenever the language is switched at runtime.
   ipcRenderer.on('veylo:titlebar-labels', (_event, labels) => {
     if (!labels || typeof labels !== 'object') return;
     titlebarLabels = { ...titlebarLabels, ...labels };

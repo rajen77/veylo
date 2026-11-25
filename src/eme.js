@@ -1,42 +1,16 @@
 'use strict';
 
-/**
- * Downgrades hardware-secure Widevine robustness requests to software-secure
- * ones before the page's player negotiates DRM.
- *
- * Presenting the client as Windows Chrome (see src/user-agent.js) makes the
- * Apple TV+ player ask for a hardware-secure content path:
- *
- *     navigator.requestMediaKeySystemAccess('com.widevine.alpha', [{
- *       videoCapabilities: [{ robustness: 'HW secure' }], …
- *
- * No such path exists on this platform: the Widevine CDM shipped with this
- * build is software-only (security level L3). The request is therefore
- * rejected with `NotSupportedError`, the player never obtains a key, and the
- * site surfaces its generic "An Error Occurred" dialog.
- *
- * Rewriting `HW secure` to `SW secure` asks for exactly what the CDM can
- * deliver. Nothing is added: a hardware-secure request could not have
- * succeeded here in the first place, so services that already fall back to a
- * software config themselves (Netflix, Disney+, Max) end up in the same place
- * they would have reached on their own.
- *
- * Like the codec patch in src/codecs.js, this has to run in the page's own
- * JavaScript world — a preload script's isolated world shares no prototypes
- * with the player, so a patch applied there would be invisible to it.
- */
+// Windows identity can trigger hardware-secure requests that the L3 CDM cannot satisfy.
+// Patch the page's world because isolated preload prototypes are invisible to it.
 
 const MAIN_WORLD_SOURCE = `(() => {
-  // Repeated on every main-frame navigation; guard so the prototype is not
-  // wrapped again on each one.
+  // Avoid wrapping the API repeatedly across navigations.
   if (window.__veyloEmeRobustnessFixed) return true;
 
   const toSoftware = (value) =>
     (typeof value === 'string' && /hw/i.test(value) ? 'SW secure' : value);
 
-  // Robustness lives either directly on the config (videoRobustness /
-  // audioRobustness) or inside its capability arrays (videoCapabilities /
-  // audioCapabilities), depending on how the player builds the request.
+  // Players can specify robustness on the config or in capability arrays.
   const patchCapability = (cap) => {
     if (!cap || typeof cap !== 'object') return cap;
     const patched = { ...cap };

@@ -32,6 +32,15 @@
     <category>Player</category>
   </categories>
   <releases>
+    <release version="0.9.4" date="2026-11-25">
+      <description>
+        <ul>
+          <li>Add optional Patreon support links</li>
+          <li>Fix update feed errors and NVIDIA driver detection</li>
+          <li>Improve playback fallback and title-bar reliability</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.9.0" date="2026-11-23">
       <description>
         <ul>

@@ -7,27 +7,10 @@ const log = require('./logger');
 const { t, language } = require('./i18n');
 const { computeLayout } = require('./picker-layout');
 const { availableInRegion, orderedServices, moveService } = require('./services');
-
-/**
- * The startup chooser: a small frameless window that asks which streaming
- * service to open. It is shown whenever "open on startup" is off, and its
- * answer decides the service for this run — and, if the box is ticked, the one
- * that opens on the next launch without asking.
- *
- * The page is written to a file under the user-data directory with the service
- * icons inlined as data URLs. A real file rather than a data: URL, because the
- * chooser answers through its preload and preload delivery on data: pages is
- * not something to rely on; inlining the icons keeps the page independent of
- * where it is written.
- *
- * Like the main window, the chooser is shown before its content loads rather
- * than from 'ready-to-show': a frameless window mapped after the first paint
- * gets a transparent surface on this platform. See the note in src/window.js.
- */
+const { openSupportPage } = require('./support');
 
 let openWindow = null;
 
-/** Focuses the chooser if it is still up. Returns false when it is not. */
 function focusPicker() {
   if (!openWindow || openWindow.isDestroyed()) return false;
   if (openWindow.isMinimized()) openWindow.restore();
@@ -35,7 +18,7 @@ function focusPicker() {
   return true;
 }
 
-/** Inlines an icon so the data-URL page needs no file access. */
+// Inline icons so the generated page is independent of its location.
 function iconDataUrl(file) {
   const image = nativeImage.createFromPath(file);
   if (image.isEmpty()) {
@@ -53,11 +36,6 @@ function escapeHtml(text) {
     .replace(/"/g, '&quot;');
 }
 
-/**
- * Reads the layout constants the chooser's window size is computed from:
- * the body's horizontal padding, the card size, the grid gap, how many cards
- * there are, the grid's max-width, and the reserved scrollbar width.
- */
 const READ_CONSTANTS_SOURCE = `(() => {
   const el = document.querySelector('.cards');
   const visible = el && el.querySelectorAll('.tile:not([hidden])');
@@ -75,25 +53,8 @@ const READ_CONSTANTS_SOURCE = `(() => {
   };
 })()`;
 
-/**
- * Builds the script that reports the height the page needs when its body is
- * laid out `width` pixels wide.
- *
- * The page cannot answer this from its own scroll metrics: `height: 100%`
- * pins html/body to the window (so scrollHeight reports the window height,
- * not the content's), scrollHeight drops the body's bottom padding once the
- * content overflows, and the cards area is a flex child capped by `flex: 1`
- * (so it shrinks to the window and hides how tall the grid naturally is).
- * The script releases those constraints, lays the body out at the exact width
- * the window is about to get, and reads the body's own box — which includes
- * its padding and is independent of the window. All services and arrangement
- * controls are temporarily shown so later changes do not require a resize.
- * Scrollbars are suppressed
- * during the measurement: a vertical scrollbar would take width away from the
- * body, which can drop the grid a column and report a height for the wrong
- * layout. Everything is restored before it returns, so the page never paints
- * the intermediate state.
- */
+// Measure unconstrained content including hidden cards and editing controls.
+// Suppress scrollbars to avoid measuring a different column count.
 function heightSource(width) {
   return `(() => {
     const el = document.querySelector('.cards');
@@ -125,7 +86,6 @@ function heightSource(width) {
   })()`;
 }
 
-/** Resolves once the renderer has laid the page out after a resize. */
 function nextFrames(win) {
   const frames = win.webContents
     .executeJavaScript(
@@ -134,31 +94,12 @@ function nextFrames(win) {
       true,
     )
     .catch(() => true);
-  // Never wait on rAF alone: a window that is not being painted may not run
-  // animation frames at all.
+  // An unpainted window may never run animation frames.
   return Promise.race([frames, new Promise((resolve) => setTimeout(resolve, 100))]);
 }
 
-/**
- * Sizes the chooser to its content so adding services never means resizing the
- * window by hand: the page wraps into as many rows as the list needs, and the
- * window grows to show them — but never past the display's work area. Content
- * that still does not fit scrolls inside the cards grid.
- *
- * The width is computed rather than measured: the grid's columns are fixed
- * tracks, so the width for a chosen column count is exact, while measuring
- * natural width would feed back on itself (a scrollbar takes width away, which
- * changes the column count, which changes the height, which decides whether
- * the scrollbar is there). The height is then measured with the window already
- * at its final width and re-checked after each application for the same
- * reason: a window that is still too short shows a scrollbar, and that can
- * change the row count.
- *
- * Window managers do not always grant exactly what is requested — this one
- * inflates by a few pixels — so each request is corrected by how much the
- * previous one overshot until the granted size both fits the content and stays
- * inside the work area.
- */
+// Compute width before measuring height to avoid scrollbar/column feedback.
+// Correct requests because the window manager may grant a different size.
 async function fitToContent(win) {
   if (win.isDestroyed()) return;
   const run = async (source) => {
@@ -176,10 +117,6 @@ async function fitToContent(win) {
 
   const { width } = computeLayout(constants, workArea);
 
-  // Apply the width, correcting for the window manager's inflation of the
-  // previous request. Extra room within the work area is fine — only a width
-  // below the computed one (which would drop a column) or above the work area
-  // needs correcting.
   let widthRequest = width;
   for (let pass = 0; pass < 4; pass++) {
     win.setContentSize(widthRequest, win.getContentSize()[1]);
@@ -193,10 +130,6 @@ async function fitToContent(win) {
     );
   }
 
-  // Measure the height the content needs at the width the window actually
-  // has, apply it, and correct the next request by how much this one
-  // overshot — until the granted height both fits the content and stays
-  // inside the work area.
   let height = 0;
   const settleHeight = async () => {
     let heightRequest = null;
@@ -205,9 +138,7 @@ async function fitToContent(win) {
       const needed = await run(heightSource(actualWidth));
       if (needed === null || win.isDestroyed()) return false;
       const wanted = Math.min(Math.max(needed, 440), workArea.height);
-      // Stop once the granted height covers the content and stays on the
-      // display; the first pass always applies, so an oversized initial
-      // window is shrunk to fit too.
+      // Always apply the first pass to shrink an oversized initial window.
       if (pass > 0 && actualHeight >= wanted && actualHeight <= workArea.height) {
         height = actualHeight;
         return true;
@@ -227,10 +158,7 @@ async function fitToContent(win) {
   };
   if (!(await settleHeight())) return;
 
-  // The window opens centred; growing it from the top-left corner would leave
-  // it drifting down (or off-screen), so put it back in the middle of the
-  // display. The one-pixel inset keeps the window inside the work area on
-  // window managers that place a window a pixel above the requested position.
+  // Allow for window managers that place windows one pixel above the request.
   const recentre = () => {
     const bounds = win.getBounds();
     win.setPosition(
@@ -242,11 +170,7 @@ async function fitToContent(win) {
   await nextFrames(win);
   if (win.isDestroyed()) return;
 
-  // Repositioning can change the granted size again, so settle the height
-  // once more. If that left the window above the work area, nudge it back
-  // down and stop: the two corrections must not be allowed to chase each
-  // other — a pixel or two of window-manager slack is harmless, a resize
-  // loop is not.
+  // Repositioning can change the size; avoid an endless correction loop.
   await settleHeight();
   const bounds = win.getBounds();
   if (bounds.y < workArea.y || bounds.x < workArea.x) {
@@ -259,7 +183,7 @@ async function fitToContent(win) {
   log.debug(`Picker sized to ${width}x${height} for its content`);
 }
 
-/** Writes the chooser page where a file:// load (and its preload) works. */
+// A file URL ensures the chooser's preload is delivered reliably.
 function writePage(html) {
   const file = path.join(app.getPath('userData'), 'picker.html');
   try {
@@ -313,7 +237,7 @@ function buildHtml({ services, lastServiceId, prefs, country }) {
 <style>
   :root {
     color-scheme: dark;
-    --card-w: 150px;   /* fixed card size: every service tile is identical */
+    --card-w: 150px;
     --card-gap: 14px;
   }
   * { box-sizing: border-box; }
@@ -326,11 +250,7 @@ function buildHtml({ services, lastServiceId, prefs, country }) {
   }
   h1 { margin: 0; font-size: 16px; font-weight: 600; }
   .sub { margin: 4px 0 18px; font-size: 12.5px; color: #93a3ba; }
-  /* Fixed-width grid tracks wrap into as many rows as needed, and the
-     max-width caps a row at seven cards. Rows and columns
-     are centred so a partially filled last row stays balanced. The 'safe'
-     keyword keeps the content reachable when the window is shrunk below one
-     full screen. */
+  /* Safe alignment keeps overflowing content reachable in small windows. */
   .cards {
     display: grid; gap: var(--card-gap); flex: 1; min-height: 0;
     grid-template-columns: repeat(auto-fill, var(--card-w));
@@ -381,6 +301,15 @@ function buildHtml({ services, lastServiceId, prefs, country }) {
     background: #1d2b42; color: inherit; font: inherit; cursor: pointer;
   }
   .hint { margin-top: 6px; font-size: 11px; color: #6d7d95; }
+  .support {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px;
+    margin-top: 8px; font-size: 11px; color: #a4b2c7;
+  }
+  .support button {
+    -webkit-app-region: no-drag; padding: 2px 0; border: 0; background: none;
+    color: #8dbbff; font: inherit; text-decoration: underline; cursor: pointer;
+  }
+  .support button:focus-visible { outline: 2px solid #4ea1ff; outline-offset: 2px; }
 </style>
 </head>
 <body>
@@ -398,6 +327,11 @@ function buildHtml({ services, lastServiceId, prefs, country }) {
     <span>${escapeHtml(t('picker.autoOpen'))}</span>
   </label>
   <div class="hint">${escapeHtml(t('picker.hint'))}</div>
+  <div class="support">
+    <span>${escapeHtml(t('support.teaser'))}</span>
+    <button type="button" id="support">${escapeHtml(t('support.button'))}</button>
+    <span>${escapeHtml(t('support.shortOptional'))}</span>
+  </div>
   <script>
     (function () {
       var api = window.veyloPicker;
@@ -443,6 +377,7 @@ function buildHtml({ services, lastServiceId, prefs, country }) {
       api.onState(update);
       update(${initialState});
       arrange.addEventListener('click', function () { api.change('edit'); });
+      document.getElementById('support').addEventListener('click', function () { api.support(); });
       hide.addEventListener('change', function () { api.change('hide', hide.checked); });
       grid.addEventListener('click', function (event) {
         var button = event.target.closest('button');
@@ -483,7 +418,7 @@ function buildHtml({ services, lastServiceId, prefs, country }) {
 }
 
 /**
- * Shows the chooser and resolves with the decision: `{ id, autoOpen }` when a
+ * Resolves with `{ id, autoOpen, displayId }` when a
  * service was picked, `null` when the window was dismissed. The window is
  * destroyed before the promise settles, so the caller never has to clean up.
  *
@@ -497,9 +432,6 @@ function pickService({ services, lastServiceId, prefs, country, onChange, confir
   const html = buildHtml({ services, lastServiceId, prefs, country });
 
   return new Promise((resolve) => {
-    // Initial size only: once the page has loaded, fitToContent() grows the
-    // window to the rows the current service list needs (clamped to the
-    // display), so no fixed size has to be kept in step with SERVICES.
     const win = new BrowserWindow({
       x: display.workArea.x + Math.max(0, Math.round((display.workArea.width - 700) / 2)),
       y: display.workArea.y + Math.max(0, Math.round((display.workArea.height - 480) / 2)),
@@ -545,6 +477,7 @@ function pickService({ services, lastServiceId, prefs, country, onChange, confir
       ipcMain.removeListener('picker:select', onSelect);
       ipcMain.removeListener('picker:cancel', onCancel);
       ipcMain.removeListener('picker:change', onChangeRequest);
+      ipcMain.removeListener('picker:support', onSupport);
       win.removeAllListeners('closed');
       openWindow = null;
       if (!win.isDestroyed()) win.destroy();
@@ -577,6 +510,11 @@ function pickService({ services, lastServiceId, prefs, country, onChange, confir
       settle(null);
     }
 
+    function onSupport(event) {
+      if (event.sender !== win.webContents || win.isDestroyed()) return;
+      openSupportPage();
+    }
+
     function onChangeRequest(event, payload) {
       if (event.sender !== win.webContents || !payload || typeof payload !== 'object') return;
       const { action, id } = payload;
@@ -606,6 +544,7 @@ function pickService({ services, lastServiceId, prefs, country, onChange, confir
     ipcMain.on('picker:select', onSelect);
     ipcMain.on('picker:cancel', onCancel);
     ipcMain.on('picker:change', onChangeRequest);
+    ipcMain.on('picker:support', onSupport);
     win.on('close', (event) => {
       event.preventDefault();
       settle(null);

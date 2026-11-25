@@ -1,14 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
-/**
- * Generates the client's icon set from the project's single icon source,
- * veylo.png, by decoding it and resizing it to every required size.
- *
- * Both the decoder and the encoder are written by hand with zlib so that the
- * build has no image library dependency and works inside a minimal Flatpak
- * build sandbox.
- */
+// Avoid an image library dependency in the minimal Flatpak build sandbox.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -19,7 +12,6 @@ const OUT_DIR = path.join(__dirname, '..', 'assets');
 const BUILD_DIR = path.join(__dirname, '..', 'build', 'icons');
 const FLATPAK_ICON_NAME = 'io.github.veylo.Client.png';
 
-// Every icon theme size written below; also the set checked for up-to-dateness.
 const SIZES = [16, 22, 24, 32, 48, 64, 128, 256, 512];
 
 function paeth(a, b, c) {
@@ -32,13 +24,6 @@ function paeth(a, b, c) {
   return c;
 }
 
-/**
- * Decodes an 8-bit, non-interlaced RGB or RGBA PNG into raw RGBA rows.
- *
- * A minimal reader keeps the build free of image library dependencies, which
- * matters inside the Flatpak build sandbox. Any other PNG format is rejected
- * with a clear error rather than silently mis-decoded.
- */
 function decodePng(buffer) {
   const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   if (!buffer.subarray(0, 8).equals(signature)) {
@@ -86,8 +71,7 @@ function decodePng(buffer) {
     throw new Error(`${SOURCE}: pixel data is truncated`);
   }
 
-  // Undo the per-scanline filters in place; left/up neighbours are the already
-  // reconstructed values, as the PNG spec requires.
+  // PNG filters use already reconstructed left and upper neighbours.
   const pixels = Buffer.alloc(stride * height);
   for (let y = 0; y < height; y += 1) {
     const filter = raw[y * (stride + 1)];
@@ -123,11 +107,7 @@ function decodePng(buffer) {
   return { width, height, rgba };
 }
 
-/**
- * Area-average resize with premultiplied alpha, so transparent corners of the
- * icon do not bleed their colour into the surrounding pixels on downscale.
- * Fractional source rectangles keep odd sizes (22, 24) free of aliasing.
- */
+// Premultiplied alpha prevents colour bleed; fractional areas avoid aliasing.
 function resizeRgba(src, sw, sh, dw, dh) {
   const dst = Buffer.alloc(dw * dh * 4);
   const xr = sw / dw;
@@ -231,7 +211,6 @@ function writePng(filePath, rgba, size) {
   return filePath;
 }
 
-/** True when every generated file exists and is at least as new as the source. */
 function iconsUpToDate() {
   const sourceMtime = fs.statSync(SOURCE).mtimeMs;
   const outputs = [
@@ -258,8 +237,7 @@ function main() {
     process.exit(1);
   }
 
-  // Every dist* script runs this; re-encoding all sizes at deflate level 9 is
-  // wasted work when veylo.png has not changed and the outputs are current.
+  // Avoid repeated level-9 encoding when the generated icons are current.
   if (iconsUpToDate()) {
     console.log('Icons are up to date; nothing to regenerate.');
     return;
@@ -271,13 +249,10 @@ function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   fs.mkdirSync(BUILD_DIR, { recursive: true });
 
-  // Electron's dock/tray icon.
   writePng(path.join(OUT_DIR, 'tray.png'), iconAt(22), 22);
   writePng(path.join(OUT_DIR, 'icon.png'), iconAt(512), 512);
 
-  // Icon theme sizes. electron-builder expects flat <size>.png files directly
-  // inside the icons directory, while Flatpak wants <size>x<size>/<app-id>.png,
-  // so both layouts are written from the same source.
+  // electron-builder and Flatpak expect different icon layouts.
   for (const size of SIZES) {
     const dir = path.join(BUILD_DIR, `${size}x${size}`);
     fs.mkdirSync(dir, { recursive: true });
@@ -285,7 +260,6 @@ function main() {
     fs.copyFileSync(icon, path.join(BUILD_DIR, `${size}.png`));
   }
 
-  // Flatpak looks for the app id under share/icons/hicolor.
   const flatpakIconDir = path.join(__dirname, '..', 'flatpak', 'icons');
   fs.mkdirSync(flatpakIconDir, { recursive: true });
   fs.copyFileSync(path.join(BUILD_DIR, '512x512', 'veylo.png'), path.join(flatpakIconDir, FLATPAK_ICON_NAME));

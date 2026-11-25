@@ -5,17 +5,14 @@ const log = require('./logger');
 const { isDebug } = log;
 const { VOLUME_STEP } = require('./playback');
 const { t, available: availableLanguages } = require('./i18n');
+const { openSupportPage } = require('./support');
 
 const DEVELOPER_URL = 'https://github.com/rajen77';
 const PROJECT_URL = 'https://github.com/rajen77/veylo';
 // I, P and R are reserved for devtools, picture-in-picture and force reload.
 const SERVICE_LETTER_KEYS = 'ABCDEFGHJKLMNOQSTUVWXYZ';
 
-/**
- * Builds the application menu. On Linux this is the only place accelerators can
- * be registered globally, which is how playback shortcuts work even while the
- * video has focus inside the page.
- */
+// Native menu accelerators work even while the page has focus.
 function buildMenu({
   window,
   media,
@@ -95,15 +92,7 @@ function buildMenu({
     ],
   });
 
-  // One radio per locale file found in locales/, plus the automatic choice
-  // that follows the system language. The list comes from the directory, so a
-  // new translation shows up here without a code change.
-  //
-  // No separator between the automatic choice and the languages on purpose:
-  // Electron groups radio items up to the next separator, and a group without
-  // a checked item gets its first entry checked — which would mark a language
-  // as chosen while "Automatic" is the real state. One group keeps exactly one
-  // radio filled.
+  // Keep automatic and explicit languages in one Electron radio group.
   const languages = availableLanguages();
   const languageListed = languages.some((entry) => entry.code === languagePref);
   template.push({
@@ -130,8 +119,6 @@ function buildMenu({
     label: t('menu.view.title'),
     submenu: [
       {
-        // A checkbox rather than a plain item so the menu shows which mode the
-        // window is in; the title bar's fullscreen button is the other way in.
         id: 'view-fullscreen',
         label: t('menu.view.fullscreen'),
         type: 'checkbox',
@@ -140,9 +127,6 @@ function buildMenu({
         click: () => window.toggleFullscreen(),
       },
       {
-        // A second accelerator for the same action. F11 is the Linux
-        // convention, Alt+Return the media-player one, and neither is claimed
-        // by the page's own text fields.
         label: t('menu.view.fullscreenAlt'),
         visible: false,
         accelerator: 'Alt+Return',
@@ -154,8 +138,7 @@ function buildMenu({
         click: () => media.togglePinned(),
       },
       { type: 'separator' },
-      // The roles keep their behaviour but bring their own label: role labels
-      // come from Chromium's baked-in strings and are always English.
+      // Override Chromium's English role labels with translations.
       { role: 'reload', label: t('menu.view.reload'), accelerator: 'CommandOrControl+R' },
       { role: 'forceReload', label: t('menu.view.forceReload') },
       { type: 'separator' },
@@ -216,18 +199,22 @@ function buildMenu({
             type: 'info',
             title: t('dialogs.about.title'),
             message: 'Veylo',
-            detail: t('dialogs.about.detail', {
+            detail: `${t('dialogs.about.detail', {
               version: app.getVersion(),
               developer: 'Szabó Kornél',
               profile: DEVELOPER_URL,
               project: PROJECT_URL,
               license: 'MIT',
-            }),
-            buttons: [t('menu.ok'), t('dialogs.about.developerProfile'), t('dialogs.about.projectPage')],
+            })}\n\n${t('support.description')}\n${t('support.optional')}`,
+            buttons: [t('menu.ok'), t('dialogs.about.developerProfile'), t('dialogs.about.projectPage'), t('support.button')],
             defaultId: 0,
             cancelId: 0,
             noLink: true,
           });
+          if (response === 3) {
+            await openSupportPage();
+            return;
+          }
           const url = [null, DEVELOPER_URL, PROJECT_URL][response];
           if (url) {
             try {
@@ -254,8 +241,6 @@ function buildMenu({
   // set it explicitly so the radio state matches the active service.
   if (window && window.window && !window.window.isDestroyed()) window.window.setMenu(menu);
   if (isDebug) {
-    // Two levels deep: enough to see the whole interface at a glance when
-    // checking a translation or a rebuild.
     const labels = template.flatMap((item) => (item.label
       ? [item.label, ...(item.submenu || [])
         .filter((child) => child.label)
@@ -263,8 +248,6 @@ function buildMenu({
       : []));
     log.debug(`Menu (${labels.length} items):`, labels.join(' | '));
   }
-  // The radio state comes from the template alone: assigning `checked` to a
-  // radio item afterwards re-selects the last entry of the group.
   const autoItem = menu.getMenuItemById('service-auto-open');
   if (autoItem) autoItem.checked = autoOpen;
   return menu;

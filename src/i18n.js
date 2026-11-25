@@ -4,23 +4,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 const log = require('./logger');
 
-/**
- * Interface translations.
- *
- * The strings live in `locales/<code>.json` (see locales/README.md); this
- * module resolves which language to use, looks keys up with a fallback to the
- * base language, and fills `{placeholders}` in at call time.
- *
- * The lookup is a dotted path (`menu.playback.title`), so a file can group its
- * keys the way the interface is grouped. Files are discovered by listing the
- * directory: dropping in `fr.json` is all it takes to add French.
- *
- * Nothing here imports Electron, so the resolution inputs (the stored
- * preference and the system locale) are passed in by the caller — the module
- * can be exercised from a plain Node process, which is how it is checked
- * outside the app.
- */
-
 const BASE = 'en';
 const LOCALES_DIR = path.join(__dirname, '..', 'locales');
 
@@ -31,7 +14,6 @@ let fileNames = null;
 let active = BASE;
 let activeDict = null;
 
-/** The language codes present in the locales directory. */
 function fileNamesOf() {
   if (fileNames) return fileNames;
   try {
@@ -63,16 +45,10 @@ function dictFor(code) {
   return parsed;
 }
 
-/** The language part of a locale such as `hu-HU` or `de_DE`. */
 function baseCode(locale) {
   return String(locale || '').toLowerCase().split(/[-_]/)[0];
 }
 
-/**
- * The language to run in: an explicit choice when it exists, otherwise the
- * first locale source that names a language with a file here, otherwise the
- * base language.
- */
 function resolve(preference, systemLocale) {
   if (preference && preference !== 'auto' && has(preference)) return preference;
   for (const candidate of localeCandidates(systemLocale)) {
@@ -82,23 +58,13 @@ function resolve(preference, systemLocale) {
   return BASE;
 }
 
-/**
- * The locale sources in POSIX order — LANGUAGE (an explicit user choice), then
- * LC_ALL, LC_MESSAGES and LANG — followed by whatever the caller detected.
- *
- * The environment leads because that is what the desktop sets and it is always
- * present: Electron's own detection can come back empty (seen under Flatpak,
- * where app.getLocale() returns '' despite LANG=hu_HU.UTF-8), and without this
- * chain that would fall back to English on a Hungarian system. A candidate with
- * no matching locale file (C.UTF-8, say) simply falls through to the next.
- */
+// Electron can report an empty locale in a sandbox; prefer desktop environment settings.
 function localeCandidates(detected) {
   const language = (process.env.LANGUAGE || '').split(':')[0];
   return [language, process.env.LC_ALL, process.env.LC_MESSAGES, process.env.LANG, detected]
     .filter(Boolean);
 }
 
-/** Switches the active language; unknown codes fall back to the base one. */
 function setLanguage(code) {
   if (code && code !== BASE && !has(code)) {
     log.warn(`Locale "${code}" is not available; using ${BASE}.`);
@@ -108,25 +74,17 @@ function setLanguage(code) {
   return active;
 }
 
-/**
- * The Accept-Language list for the active language: the full locale tag from
- * `_meta.acceptLocale` (e.g. `hu-HU`) followed by the bare code, as an ordered
- * list of language codes. The page-side `navigator.language` is built from the
- * same list, so what the header claims and what the page reads agree — this is
- * how the Language menu also steers the content the services offer.
- */
+// Keep request headers and page-side language consistent.
 function acceptLanguages() {
   const meta = (dictFor(active) || {})._meta || {};
   const primary = String(meta.acceptLocale || active);
   return primary === active ? [active] : [primary, active];
 }
 
-/** The active language code. */
 function language() {
   return active;
 }
 
-/** Every language with a file here, base language first, `_meta.name` shown. */
 function available() {
   return fileNamesOf()
     .map((code) => {
@@ -159,11 +117,7 @@ function format(text, params) {
 
 const reportedMissing = new Set();
 
-/**
- * The translated string for a dotted key, with `{placeholders}` substituted.
- * Falls back to the base language, then to the key itself, so a partial or
- * broken translation can never render an empty control.
- */
+// Fall back to the key rather than rendering an empty control.
 function t(key, params) {
   let value = lookup(activeDict, key);
   if (typeof value !== 'string') value = lookup(dictFor(BASE), key);
@@ -177,7 +131,6 @@ function t(key, params) {
   return format(value, params);
 }
 
-/** The title-bar control labels, packaged for the sandboxed preload. */
 function titlebarLabels() {
   return {
     menu: t('titlebar.menu'),

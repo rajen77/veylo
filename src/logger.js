@@ -13,13 +13,7 @@ const DEBUG_ENABLED =
 
 const threshold = DEBUG_ENABLED ? LEVELS.debug : LEVELS.info;
 
-/**
- * Inside a Flatpak the process is started through zypak, which re-executes the
- * binary and does not preserve stdout. Console output would therefore be lost,
- * so an explicit log file is written as well when VEYLO_LOG_FILE is set. The
- * write is synchronous because the process may be terminated at any point, and
- * a buffered stream would lose the last lines written before that.
- */
+// zypak can drop stdout; synchronous file writes preserve logs on termination.
 const logFile = process.env.VEYLO_LOG_FILE || null;
 let logFileReady = false;
 

@@ -44,6 +44,7 @@ browser spends on everything else.
 - Single-instance lock, so a second launch focuses the running window
 - Flatpak packaging and an update check against the GitHub releases (override with `VEYLO_UPDATE_FEED`)
 - Favorite services, custom ordering and optional hiding of region-restricted services (see [Regional availability](#regional-availability))
+- Optional Patreon support for the independent developer, available from the chooser and About dialog
 
 ## Supported services
 

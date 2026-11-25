@@ -1,12 +1,4 @@
-# Flatpak manifest for Veylo.
-#
-# Build with:  npm run flatpak
-#
-# The Electron runtime comes from the castLabs fork ("Electron for Content
-# Security"), the only Electron distribution that can play Widevine protected
-# content on Linux. The Widevine CDM itself is deliberately NOT bundled: Electron
-# downloads it at runtime from Google's component service, and redistributing it
-# would breach the Widevine licence.
+# Electron downloads Widevine at runtime; the CDM must not be redistributed.
 app-id: io.github.veylo.Client
 runtime: org.freedesktop.Platform
 runtime-version: '26.08'
@@ -16,10 +8,7 @@ base-version: '26.08'
 command: run.sh
 separate-locales: false
 
-# The app is a single-site browser: everything it displays is the official
-# web player of the streaming service chosen at startup. No shell, no host
-# filesystem and no host D-Bus beyond the handful of names needed for media
-# keys and the tray icon.
+# Limit host access to the services needed for playback and desktop integration.
 finish-args:
   - --share=network
   - --share=ipc
@@ -54,13 +43,9 @@ modules:
         npm_config_cache: /run/build/veylo/flatpak-node/npm-cache
         npm_config_offline: 'true'
     build-commands:
-      # Offline install from the vendored tarballs. Scripts are skipped on
-      # purpose: the only install script in the tree would download a second
-      # copy of Electron, which the BaseApp already provides.
+      # Use the separately packaged Electron runtime instead of downloading another.
       - npm ci --offline --omit=dev --ignore-scripts
-      # Electron resolves its app bundle relative to its own binary, so the
-      # application lives in resources/app. This keeps the zypak invocation to
-      # "binary plus Chromium switches", which is all zypak accepts.
+      # zypak expects the app bundle relative to the Electron binary.
       - install -d /app/main/electron
       - cp -a electron/. /app/main/electron/
       - install -d /app/main/electron/resources/app
@@ -71,10 +56,7 @@ modules:
       - install -Dm644 io.github.veylo.Client.metainfo.xml /app/share/metainfo/io.github.veylo.Client.metainfo.xml
       - install -Dm644 io.github.veylo.Client.png /app/share/icons/hicolor/512x512/apps/io.github.veylo.Client.png
     sources:
-      # castLabs publishes one archive per architecture, so the right one has to
-      # be selected at build time. Flatpak matches only-arches against the
-      # architecture it is building for, which makes this manifest work for both
-      # x86_64 and aarch64 without a separate file.
+      # castLabs publishes separate archives for each architecture.
       - type: archive
         url: https://github.com/castlabs/electron-releases/releases/download/v44.5.1%2Bwvcus/electron-v44.5.1+wvcus-linux-x64.zip
         sha256: afa7d4ea49abf1e91c5be0f88cfe1abdb977ff3454d57658e90b004aacbde9cc
@@ -112,24 +94,11 @@ modules:
         commands:
           - export ZYPAK_EXPOSE_WIDEVINE_PATH="${XDG_CONFIG_HOME}/veylo/WidevineCdm"
           - mkdir -p "${ZYPAK_EXPOSE_WIDEVINE_PATH}"
-          # zypak re-executes the binary and drops stdout, so logs go to a file
-          # that users can inspect when troubleshooting playback.
+          # zypak drops stdout when it re-executes Electron.
           - export VEYLO_LOG_FILE="${XDG_STATE_HOME:-${XDG_DATA_HOME}}/veylo/client.log"
-          # zypak's "spawn" zygote strategy deadlocks with this Electron build:
-          # the helper blocks on the chroot handshake and no JavaScript ever
-          # runs. The "mimic" strategy works, so pin it explicitly instead of
-          # letting the Flatpak portal version decide. See docs/FLATPAK.md.
+          # The spawn zygote strategy deadlocks with this Electron build.
           - export ZYPAK_ZYGOTE_STRATEGY_SPAWN=0
-          # Chromium writes the tray icon to a temp file (IconThemePath) on
-          # MATE instead of sending a DBus pixmap. The sandbox's /tmp and
-          # XDG_RUNTIME_DIR are private, so the StatusNotifierHost on the host
-          # cannot read the file and shows a "missing icon" placeholder. The
-          # per-app dir under XDG_RUNTIME_DIR/app is shared with the host, so
-          # point TMPDIR there to make the icon file visible outside the sandbox.
+          # MATE's host tray must be able to read Chromium's temporary icon file.
           - export TMPDIR="${XDG_RUNTIME_DIR}/app/${FLATPAK_ID}"
-          # The GPU process cannot create its own Chromium sandbox underneath
-          # the Flatpak sandbox (bwrap already set up the namespaces), so GPU
-          # launches fail with error_code=1002 and Chromium aborts with
-          # "GPU process isn't usable". Disabling only the GPU sandbox keeps the
-          # renderer sandbox, and therefore Widevine's L3 path, intact.
+          # The GPU sandbox cannot nest under bwrap; retain the renderer sandbox.
           - exec zypak-wrapper.sh /app/main/electron/electron --disable-gpu-sandbox "$@"

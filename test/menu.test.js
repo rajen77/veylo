@@ -59,6 +59,8 @@ it('shows localized developer credits and opens the selected About links', async
     assert.ok(dialogOptions.detail.includes('https://github.com/rajen77'));
     assert.ok(dialogOptions.detail.includes('https://github.com/rajen77/veylo'));
     assert.ok(dialogOptions.detail.includes('MIT'));
+    assert.ok(dialogOptions.detail.includes(i18n.t('support.optional')));
+    assert.ok(dialogOptions.buttons.includes(i18n.t('support.button')));
     assert.equal(dialogOptions.cancelId, 0);
     assert.equal(opened.length, 0);
   }
@@ -68,7 +70,13 @@ it('shows localized developer credits and opens the selected About links', async
   await about.click();
   response = 2;
   await about.click();
-  assert.deepEqual(opened, ['https://github.com/rajen77', 'https://github.com/rajen77/veylo']);
+  response = 3;
+  await about.click();
+  assert.deepEqual(opened, [
+    'https://github.com/rajen77',
+    'https://github.com/rajen77/veylo',
+    'https://www.patreon.com/cw/rajen77',
+  ]);
 });
 
 it('assigns service shortcuts in menu order without using reserved letter shortcuts', () => {

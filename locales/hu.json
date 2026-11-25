@@ -88,6 +88,15 @@
       }
     }
   },
+  "support": {
+    "title": "A Veylo támogatása",
+    "teaser": "Tetszik a Veylo? Segítsd a független, nyílt forrású fejlesztést!",
+    "button": "Támogatás a Patreonon",
+    "shortOptional": "A támogatás önkéntes.",
+    "description": "Önállóan fejlesztek szabad és nyílt forrású szoftvereket. A támogatás segít több időt fordítani a projektek fejlesztésére, javítására és karbantartására.",
+    "optional": "Minden alkalmazás ingyenes és nyílt forrású marad. A támogatás teljesen önkéntes.",
+    "openFailed": "Nem sikerült megnyitni a Patreon oldalt a böngészőben."
+  },
   "picker": {
     "heading": "Válassz streaming szolgáltatást",
     "subtitle": "A Veylo a választott szolgáltatás hivatalos weblejátszóját nyitja meg.",

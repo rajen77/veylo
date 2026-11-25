@@ -1,6 +1,6 @@
 {
   "name": "veylo",
-  "version": "0.9.0",
+  "version": "0.9.4",
   "description": "Lightweight streaming desktop client for Linux, built on Electron for Content Security (Widevine).",
   "license": "MIT",
   "private": true,

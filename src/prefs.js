@@ -6,18 +6,6 @@ const { app } = require('electron');
 const log = require('./logger');
 const { DEFAULT_SERVICE_ID, getService } = require('./services');
 
-/**
- * The choices that are not window geometry: which service was used last,
- * whether it should open without asking, and which interface language to use
- * (`auto` follows the system locale; a code such as `de` pins it). Window state
- * has its own file (see src/window-state.js); keeping these apart means neither
- * can corrupt the other, and this file stays small enough to edit by hand.
- *
- * An unknown or removed service id falls back to the default rather than
- * being passed on: a stale id must not produce a window with no page. An
- * unknown language is left to src/i18n.js, which falls back to English.
- */
-
 const FILE_NAME = 'prefs.json';
 
 function prefsFile() {

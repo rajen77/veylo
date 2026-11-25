@@ -4,15 +4,7 @@ const log = require('./logger');
 
 const DESKTOP_ENTRY = 'io.github.veylo.Client';
 
-/**
- * Publishes the client on the session bus as an MPRIS player. Desktop
- * environments (GNOME, KDE, MATE with the media keys plugin) route hardware
- * media keys and the sound-applet controls to whichever MPRIS player is marked
- * as playing, so this is what makes the keyboard keys work.
- *
- * Chromium's own MediaSessionService is disabled in src/flags.js on purpose:
- * it would publish a second, competing MPRIS entry for the same playback.
- */
+// Chromium's competing MPRIS entry is disabled in flags.js.
 class MediaController {
   constructor({ window, onCommand }) {
     this.window = window;
@@ -44,8 +36,7 @@ class MediaController {
         supportedInterfaces: ['player'],
       });
     } catch (err) {
-      // Happens in sandboxes without a session bus, e.g. inside a bare
-      // container. The app must still play video in that case.
+      // Playback must still work without a session bus.
       log.warn('Could not register the MPRIS player:', err.message);
       this.unavailable = true;
       return false;
@@ -74,8 +65,6 @@ class MediaController {
     });
     player.on('volume', (level) => this.onCommand('setvolume', level));
 
-    // Desktop integration: clicking the player in the sound applet or choosing
-    // "Quit" from the player's context menu.
     player.on('raise', () => this.window.show());
     player.on('fullscreen', () => this.window.toggleFullscreen());
 
@@ -97,8 +86,7 @@ class MediaController {
   update(state) {
     this.lastState = state;
 
-    // Keep the interpolated position anchored to every fresh sample so that
-    // MPRIS position queries stay accurate between the one-second updates.
+    // Anchor interpolation to each sample for accurate position queries.
     this.startedAt = Date.now();
 
     if (!this.player) return;
@@ -120,8 +108,7 @@ class MediaController {
     if (state.durationSeconds > 0) metadata['mpris:length'] = Math.round(state.durationSeconds * 1_000_000);
     if (state.artUrl) metadata['mpris:artUrl'] = state.artUrl;
 
-    // Reassigning metadata on every tick makes panels flicker, so only publish
-    // it when something visible actually changed.
+    // Reassigning metadata every tick makes desktop panels flicker.
     const signature = JSON.stringify(metadata);
     if (signature !== this.metadataSignature) {
       this.player.metadata = metadata;

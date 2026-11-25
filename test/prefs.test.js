@@ -6,8 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-// prefs only needs electron for app.getPath('userData'), which these cases
-// bypass by passing the file path explicitly (see test/updater.test.js).
+// These tests pass paths explicitly and do not need Electron's app API.
 const electronPath = require.resolve('electron');
 require.cache[electronPath] = {
   id: electronPath,

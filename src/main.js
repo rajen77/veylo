@@ -1,8 +1,6 @@
 'use strict';
 
-// These two modules must be required before anything that touches `app`. The
-// switches have to exist before the ready event, and the sandbox decision has
-// to exist before Chromium starts its zygote.
+// Configure Chromium before app readiness and zygote startup.
 const flags = require('./flags');
 const { applySwitches } = flags;
 const { shouldDisableSandbox } = require('./sandbox');
@@ -10,19 +8,14 @@ const { shouldDisableSandbox } = require('./sandbox');
 const { app, BrowserWindow, components, dialog, ipcMain, Menu, screen } = require('electron');
 const log = require('./logger');
 
-// Chromium cannot start without a usable sandbox, and a missing one kills the
-// process before any window appears. scripts/launch.js handles this for the
-// development path, but a packaged build is started straight through the desktop
-// entry or the AppImage runtime, which never runs the launcher. Applying it here
-// as well covers every way the app can be started.
+// Packaged builds do not pass through the development launcher.
 disallowUnusableSandbox();
 
 function disallowUnusableSandbox() {
   const { disable, reason, helper } = shouldDisableSandbox();
   if (!disable) return;
 
-  // --no-zygote is required in addition to --no-sandbox: without it Chromium
-  // still forks a zygote, which fails under the same restriction.
+  // The zygote also fails when the sandbox is unavailable.
   app.commandLine.appendSwitch('no-sandbox');
   app.commandLine.appendSwitch('no-zygote');
 
@@ -34,7 +27,6 @@ function disallowUnusableSandbox() {
 
 let applied = { nvidia: false, nvidiaVaapi: false };
 
-// The switches have to exist before the ready event, so they come first.
 applied = applySwitches();
 
 const { MainWindow } = require('./window');
@@ -51,17 +43,12 @@ const { load: loadWindowState, saveDisplay } = require('./window-state');
 const { serviceFromArgv } = require('./cli');
 const i18n = require('./i18n');
 
-// A second instance would create a competing MPRIS entry and a second Widevine
-// session, so hand focus back to the running one instead. While the service
-// chooser is up there is no player window yet, so the second launch focuses
-// that instead of starting a second chooser.
+// Avoid competing MPRIS entries and Widevine sessions.
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   log.info('Another instance is already running; focusing it.');
   app.quit();
 } else {
-  // Focus the player if there is one, otherwise the startup chooser: while the
-  // chooser is up no main window exists yet.
   app.on('second-instance', (_event, argv) => {
     const requested = serviceFromArgv(argv);
     if (requested && windowController.isAlive) {
@@ -75,15 +62,11 @@ if (!gotLock) {
 app.setName('veylo');
 app.setAppUserModelId('io.github.veylo.Client');
 
-// Which service to open, and whether to open it without asking. Read before
-// the window exists so the very first launch already knows what to show.
 let prefs = prefsStore.load();
-// `--service=<id>` opens that service directly after any regional warning.
 const cliService = serviceFromArgv(process.argv.slice(1));
 let activeService = cliService || resolveService(prefs.lastServiceId);
 let switching = false;
-// True while the startup chooser is the only window: closing it is the picker's
-// own decision (handled by its promise), not the user quitting the app.
+// Closing the startup chooser is handled by its promise, not window-all-closed.
 let pickerOpen = false;
 
 const windowController = new MainWindow({
@@ -94,8 +77,7 @@ const windowController = new MainWindow({
       windowController.window.webContents.reload();
       return;
     }
-    // The window is gone: leave the single-instance lock so the next launch
-    // starts a fresh chooser instead of focusing nothing.
+    // Avoid focusing a nonexistent window on a subsequent launch.
     if (hint === 'window-closed' && !switching) {
       log.info('Window closed; releasing the single-instance lock');
       app.releaseSingleInstanceLock();
@@ -103,14 +85,9 @@ const windowController = new MainWindow({
   },
 });
 
-// The window controls are drawn by the client, so the main process has to
-// answer for them. Registering here rather than in the window module keeps the
-// IPC surface in one place.
 windowController.titlebar.register();
 
-// The media state arrives every second while something plays; only touch the
-// native window title when it actually changed, otherwise every update is an
-// X11/Wayland round trip for the same string.
+// Avoid repeated X11/Wayland round trips for an unchanged title.
 let lastWindowTitle = null;
 // The fullscreen listener is attached once per window; see syncFullscreenMenuItem().
 let fullscreenSyncedWindow = null;
@@ -139,14 +116,6 @@ const tray = new TrayController({
   },
 });
 
-/**
- * Applies the active language everywhere it can change without a restart: the
- * browser's Accept-Language and navigator.language (so the services offer
- * content in that language too), the tray labels, and the title-bar labels of
- * every open window. The menu is rebuilt by the caller (its labels are only
- * read while it is built), and the chooser exists only during startup, where it
- * reads the language itself.
- */
 function applyLanguage() {
   i18n.setLanguage(i18n.resolve(prefs.language, app.getLocale()));
   applyBrowserLanguage();
@@ -157,11 +126,6 @@ function applyLanguage() {
   }
 }
 
-/**
- * Rebuilds the application menu so that the service radio buttons and the
- * "open on startup" checkbox show the current state. Called after every change
- * rather than only at startup, because the menu is built once.
- */
 function rebuildMenu() {
   buildMenu({
     window: windowController,
@@ -208,11 +172,7 @@ function rebuildMenu() {
   syncFullscreenMenuItem();
 }
 
-/**
- * Opens another service in place of the current one. The window is rebuilt
- * rather than navigated: each service has its own session partition, and a
- * BrowserWindow's partition is fixed when it is created.
- */
+// BrowserWindow partitions are immutable; switching services requires a new window.
 async function switchService(id, confirmed = false, displayId = null) {
   const next = getService(id);
   if (!next) return;
@@ -238,10 +198,7 @@ async function switchService(id, confirmed = false, displayId = null) {
     playback.requestRefresh();
     tray.setNowPlaying('');
     rebuildMenu();
-    // The click that triggered the switch is still being processed by the
-    // native menu, which applies its own radio toggle once the handler returns
-    // and can leave the clicked entry shown instead of the active one. Rebuild
-    // again after it has finished.
+    // Native menu radio toggles finish after the click handler returns.
     setImmediate(rebuildMenu);
   } finally {
     switching = false;
@@ -312,12 +269,7 @@ async function showPicker() {
 let shuttingDown = false;
 let cleanedUp = false;
 
-/**
- * Releases everything that holds a resource. Kept separate from shutdown()
- * because the quit path can arrive from two directions: the window closing, or
- * the menu and tray calling app.quit(). Whichever happens first does the work
- * and the other one finds it already done.
- */
+// Both window close and app quit can reach cleanup.
 function cleanup() {
   if (cleanedUp) return;
   cleanedUp = true;
@@ -328,16 +280,7 @@ function cleanup() {
   windowController.destroy();
 }
 
-/**
- * Keeps the View ▸ Fullscreen checkbox honest when the mode is changed from the
- * title bar button or with F11 rather than from the menu itself.
- *
- * The listeners are attached once per window and resolve the item through
- * Menu.getApplicationMenu() when they fire. Rebuilding the menu (on a service
- * switch or an option toggle) creates new item objects, so a listener bound to
- * an old item would update a detached one, and re-attaching on every rebuild
- * would stack listeners on a window that survived.
- */
+// Look up the current menu item at event time because rebuilding replaces it.
 function syncFullscreenMenuItem() {
   const win = windowController.window;
   if (!win || win.isDestroyed() || fullscreenSyncedWindow === win) return;
@@ -364,25 +307,17 @@ app.whenReady().then(async () => {
   log.info(`Veylo ${app.getVersion()}`);
   log.info(`Electron ${process.versions.electron}, Chromium ${process.versions.chrome}`);
   log.info(`Service: ${activeService.name} (auto-open ${prefs.autoOpen ? 'on' : 'off'})`);
-  // Resolved before anything is shown: the chooser, the menu and the title bar
-  // all read the language while they are built.
   i18n.setLanguage(i18n.resolve(prefs.language, app.getLocale()));
-  // `app.getLocale()` can be empty in a sandbox; the log then shows the POSIX
-  // locale the resolution actually fell back to (see i18n.localeCandidates).
+  // Electron's locale can be empty in a sandbox.
   log.info(`Language: ${i18n.language()} (preference: ${prefs.language}, system: ${app.getLocale() || process.env.LANGUAGE || process.env.LC_ALL || process.env.LANG || 'unknown'})`);
   if (process.platform !== 'linux') {
     log.warn('This client targets Linux; other platforms are untested.');
   }
 
-  // Resolve the country before showing the chooser or opening a service.
   const country = await detectCountry();
   log.info(`Region: ${country || 'unknown'}`);
 
-  // The Widevine CDM is installed by the Component Updater on first launch. A
-  // window created before this resolves will fail EME negotiation, so the
-  // player window waits for it below. The wait is started here rather than
-  // awaited inline so a first launch can show the service chooser while the
-  // CDM downloads instead of sitting on an empty screen.
+  // Prepare Widevine while the chooser is open; playback must wait for it.
   const widevineReady = (async () => {
     try {
       log.info('Waiting for the Widevine component to be ready…');
@@ -396,15 +331,11 @@ app.whenReady().then(async () => {
     }
   })();
 
-  // With "open on startup" off, ask which service to open. The chooser is its
-  // own window, so the main one is only created once the answer is in.
   let openDirectly = prefs.autoOpen || Boolean(cliService);
   if (openDirectly && !(await confirmService(activeService, null))) openDirectly = false;
   let pickerDisplayId = null;
   if (!openDirectly) {
     const choice = await showPicker();
-    // Dismissing the chooser quits the app (it is the only window, so closing
-    // it already triggered window-all-closed, which the flag above suppressed).
     if (!choice) {
       shutdown(0);
       return;
@@ -416,12 +347,9 @@ app.whenReady().then(async () => {
     windowController.service = activeService;
   }
 
-  // Nothing shown before this point needs the CDM, so the chooser above ran
-  // while it was being prepared; the player window must not.
   await widevineReady;
   windowController.create({ displayId: pickerDisplayId });
 
-  // The window must exist before the menu and tray can reference it.
   playback.start();
   tray.start();
   rebuildMenu();
@@ -441,8 +369,6 @@ ipcMain.on('media:state', (_event, state) => {
   playback.updateState(state);
 });
 
-// The service chooser is its own window, so it needs its own handler: the
-// global one below denies every window.open from a streaming page.
 app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() !== 'window') return;
   contents.setWindowOpenHandler(({ url }) => {
@@ -452,12 +378,8 @@ app.on('web-contents-created', (_event, contents) => {
 });
 
 app.on('window-all-closed', () => {
-  // A service switch closes the old window before the new one exists, and the
-  // startup chooser closes itself before the player window is created; neither
-  // gap may be read as the user quitting.
+  // Switching and closing the chooser can temporarily leave no windows.
   if (switching || pickerOpen) return;
-  // Closing the window is how the user quits, so this is the normal exit path
-  // rather than something that only happens during a shutdown.
   log.info('All windows closed; quitting');
   shutdown(0);
 });
@@ -465,8 +387,6 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   shuttingDown = true;
   switching = true; // the window is going away on purpose; keep the lock
-  // The window may still exist here when the quit came from the tray or from a
-  // signal, so give it a last chance to record where it was.
   windowController.persistState();
   cleanup();
 });
@@ -476,11 +396,7 @@ process.on('uncaughtException', (err) => {
 });
 
 process.on('unhandledRejection', (reason) => {
-  // mpris-service issues D-Bus calls asynchronously, so a missing desktop
-  // service cannot be caught where the player is registered. That is expected
-  // in a sandbox without a full session bus and must not be reported as a
-  // crash: playback and media keys work, and only the extra MPRIS features
-  // that the absent service would have provided are lost.
+  // Missing optional D-Bus services can reject asynchronously in sandboxes.
   const name = reason && (reason.type || reason.errorName || reason.name);
   if (name === 'org.freedesktop.DBus.Error.ServiceUnknown') {
     log.debug('A desktop D-Bus service is unavailable; MPRIS extras are limited:', reason.text || name);

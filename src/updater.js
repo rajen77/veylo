@@ -10,23 +10,13 @@ const FLATPAK_INFO = '/.flatpak-info';
 const CHECK_DELAY_MS = 20_000;
 const CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
 
-/**
- * Update strategy depends on how the client was installed:
- *
- *  - Flatpak: the sandbox has no write access to its own deployment, and the
- *    runtime is delivered by the remote. The correct behaviour is therefore to
- *    tell the user to run `flatpak update`, not to self-patch.
- *  - AppImage / deb / source: point the user at the release page, which on
- *    Linux is the only safe way to replace a running binary.
- */
+// Flatpak deployments are managed externally; other builds use the release page.
 class Updater {
   /**
    * @param {object} [options]
    * @param {string} [options.feedUrl] release feed URL; defaults to VEYLO_UPDATE_FEED, then the GitHub releases feed
    * @param {() => import('electron').BrowserWindow | null} [options.getWindow]
-   *   resolves the window dialogs attach to at call time. The player window is
-   *   rebuilt on every service switch, so a window captured once at
-   *   construction would go stale.
+   *   resolves the current window because service switches recreate it.
    */
   constructor({ feedUrl, getWindow } = {}) {
     this.feedUrl = feedUrl || process.env.VEYLO_UPDATE_FEED || DEFAULT_FEED_URL;
@@ -36,7 +26,6 @@ class Updater {
     this.isFlatpak = fs.existsSync(FLATPAK_INFO);
   }
 
-  /** The window the next dialog should attach to, or null before it exists. */
   get window() {
     return this.getWindow();
   }
@@ -106,7 +95,7 @@ class Updater {
     const current = app.getVersion();
     try {
       const latest = await this.fetchLatest();
-      if (!latest.version) return { status: 'unknown' };
+      if (!latest.version) throw new Error('Update feed did not contain a version');
 
       if (this.compareVersions(latest.version, current) > 0) {
         log.info(`Update available: ${current} -> ${latest.version}`);
@@ -144,8 +133,7 @@ class Updater {
       t('dialogs.updates.installed', { current, latest: latest.version }) +
       (this.isFlatpak ? t('dialogs.updates.flatpakHint') : '');
 
-    // The buttons are matched by id rather than by their text: the text is
-    // translated, the id is not.
+    // Translated button labels cannot identify actions reliably.
     const choices = this.isFlatpak
       ? [
         { id: 'copy', label: t('dialogs.updates.buttons.copyCommand') },

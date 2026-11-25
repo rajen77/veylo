@@ -5,11 +5,9 @@ const assert = require('node:assert/strict');
 
 const i18n = require('../src/i18n');
 
-// The module is stateful (active language); every case that switches it puts
-// the base language back so the cases stay independent.
+// Avoid leaking the module's active language into other cases.
 after(() => i18n.setLanguage('en'));
 
-/** Runs fn with process.env entries forced to the given values (null deletes). */
 function withEnv(values, fn) {
   const saved = new Map();
   for (const [key, value] of Object.entries(values)) {
@@ -40,23 +38,19 @@ describe('i18n', () => {
   });
 
   it('falls back to English for an unknown preference', () => {
-    // The host machine's locale env would otherwise win over the failed
-    // preference, so pin every locale source first.
+    // Exclude the host's locale from the fallback.
     withEnv({ LANGUAGE: null, LC_ALL: null, LC_MESSAGES: null, LANG: null }, () => {
       assert.equal(i18n.resolve('fr', 'en_US.UTF-8'), 'en');
     });
   });
 
   it('follows the system locale in POSIX precedence order', () => {
-    // LANGUAGE leads over LC_ALL and LANG.
     withEnv({ LANGUAGE: 'de:hu', LC_ALL: 'hu_HU.UTF-8', LC_MESSAGES: null, LANG: 'hu_HU.UTF-8' }, () => {
       assert.equal(i18n.resolve('auto', 'en_US.UTF-8'), 'de');
     });
     withEnv({ LANGUAGE: null, LC_ALL: 'hu_HU.UTF-8', LC_MESSAGES: null, LANG: 'de_DE.UTF-8' }, () => {
       assert.equal(i18n.resolve('auto', 'en_US.UTF-8'), 'hu');
     });
-    // A candidate with no locale file (C.UTF-8) falls through to the caller's
-    // detection; one with no file either ends at the base language.
     withEnv({ LANGUAGE: null, LC_ALL: null, LC_MESSAGES: null, LANG: 'C.UTF-8' }, () => {
       assert.equal(i18n.resolve('auto', 'de_DE.UTF-8'), 'de');
       assert.equal(i18n.resolve('auto', 'fr_FR.UTF-8'), 'en');

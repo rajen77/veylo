@@ -5,12 +5,6 @@ const { MediaController } = require('./mpris');
 
 const VOLUME_STEP = 0.05;
 
-/**
- * Connects three parties that must not know about each other directly:
- *   - the renderer, which reports and receives playback state (src/preload.js)
- *   - MPRIS, which represents the client to the desktop (src/mpris.js)
- *   - the tray and menu, which issue user commands
- */
 class Playback {
   constructor({ window, onTitleChange }) {
     this.window = window;
@@ -33,7 +27,6 @@ class Playback {
     this.onTitleChange(state.hasVideo ? state.title : '');
   }
 
-  /** Send a playback command down into the page. */
   emit(command, payload) {
     if (!this.window.isAlive) return;
     this.window.send('media:command', command, payload);
@@ -60,11 +53,7 @@ class Playback {
     log.debug(`Mute ${muted ? 'on' : 'off'}`);
   }
 
-  /**
-   * Picture-in-picture is implemented as a compact always-on-top window rather
-   * than the browser PiP API, because the streaming services do not expose PiP
-   * controls for all titles and the native route keeps the DRM session intact.
-   */
+  // A compact window preserves DRM where browser PiP is unavailable.
   togglePinned() {
     this.pinned = !this.pinned;
     this.window.setPinned(this.pinned);

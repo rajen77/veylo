@@ -88,6 +88,15 @@
       }
     }
   },
+  "support": {
+    "title": "Veylo unterstützen",
+    "teaser": "Gefällt dir Veylo? Unterstütze unabhängige Open-Source-Entwicklung.",
+    "button": "Auf Patreon unterstützen",
+    "shortOptional": "Unterstützung ist freiwillig.",
+    "description": "Ich entwickle freie Open-Source-Software unabhängig. Deine Unterstützung hilft mir, mehr Zeit in die Entwicklung, Verbesserung und Wartung dieser Projekte zu investieren.",
+    "optional": "Alle Anwendungen bleiben kostenlos und quelloffen. Die Unterstützung ist völlig freiwillig.",
+    "openFailed": "Die Patreon-Seite konnte nicht im Browser geöffnet werden."
+  },
   "picker": {
     "heading": "Streaming-Dienst auswählen",
     "subtitle": "Veylo öffnet den offiziellen Webplayer des gewählten Dienstes.",

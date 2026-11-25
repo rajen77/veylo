@@ -13,7 +13,6 @@ const {
 } = require('../src/region');
 const { getService } = require('../src/services');
 
-/** A fetch stand-in that answers each URL with the given body. */
 function fetchReturning(body, { ok = true, status = 200 } = {}) {
   const calls = [];
   const fetchImpl = async (url) => {
@@ -25,8 +24,7 @@ function fetchReturning(body, { ok = true, status = 200 } = {}) {
 }
 
 beforeEach(() => {
-  // Every case starts from "nothing known": the module keeps its result for
-  // the whole run, which is exactly what has to be reset between cases.
+  // Reset the module's cached result between cases.
   setRegion(null);
 });
 

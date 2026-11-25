@@ -28,8 +28,9 @@ function media({ paused = true, width = 0, height = 0 } = {}) {
 }
 
 function loadPreload() {
-  const elements = { video: [], audio: [] };
+  const elements = { video: [], audio: [], 'button, [role="button"], a[role="button"]': [] };
   const states = [];
+  const warnings = [];
   const document = {
     readyState: 'loading',
     title: 'Track',
@@ -40,11 +41,12 @@ function loadPreload() {
   const context = {
     document,
     window: { clearTimeout() {}, setTimeout() { return 1; } },
+    console: { warn(...args) { warnings.push(args); } },
     require: () => ({ ipcRenderer: { send(_channel, state) { states.push(state); } } }),
   };
   const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
   const api = vm.runInNewContext(`${source}\n;({ activeMedia, scan, snapshot, COMMANDS })`, context);
-  return { ...api, elements, states };
+  return { ...api, elements, states, warnings };
 }
 
 describe('preload media controls', () => {
@@ -91,5 +93,32 @@ describe('preload media controls', () => {
     app.scan();
     assert.equal(video.listeners.size, 0);
     assert.equal(app.states.at(-1).hasVideo, false);
+  });
+
+  it('uses the player button when play-pause cannot start media directly', async () => {
+    const app = loadPreload();
+    const video = media();
+    video.play = () => Promise.reject(new Error('blocked'));
+    let clicked = false;
+    app.elements.video.push(video);
+    app.elements['button, [role="button"], a[role="button"]'].push({
+      getAttribute(name) { return name === 'aria-label' ? 'Play' : null; },
+      click() { clicked = true; },
+    });
+    app.COMMANDS.playpause();
+    await Promise.resolve();
+    assert.equal(clicked, true);
+    assert.equal(app.warnings.length, 0);
+  });
+
+  it('logs a failed play request when no player button is available', async () => {
+    const app = loadPreload();
+    const video = media();
+    video.play = () => Promise.reject(new Error('blocked'));
+    app.elements.video.push(video);
+    app.COMMANDS.play();
+    await Promise.resolve();
+    assert.equal(app.warnings.length, 1);
+    assert.match(app.warnings[0][1], /blocked/);
   });
 });

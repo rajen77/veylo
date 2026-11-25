@@ -53,8 +53,9 @@ searches every layout:
 
 The tuple is `x86_64-linux-gnu`, `aarch64-linux-gnu`, `arm-linux-gnueabihf` or
 `i386-linux-gnu` depending on `process.arch`, so the same build works on both
-supported architectures. An existing `LIBVA_DRIVERS_PATH` is always honoured and
-searched first.
+supported architectures. When `LIBVA_DRIVERS_PATH` is set, only the explicitly
+listed directories are searched, matching libva's behavior. Include the
+`nvidia-vaapi-driver` subdirectory itself if the shim is installed there.
 
 ## What the client does for you
 
@@ -66,9 +67,9 @@ searched first.
   `AcceleratedVideoDecodeLinuxGL` are enabled.
 - `LIBVA_DRIVER_NAME=nvidia` and `NVD_BACKEND=direct` are exported so libva
   loads the shim instead of looking for a Mesa driver.
-- `LIBVA_DRIVERS_PATH` is published, pointing at the directory the shim was
-  actually found in. libva treats this variable as a replacement for its own
-  built-in list, so without it the shim is located but never loaded.
+- Unless already set, `LIBVA_DRIVERS_PATH` is published, pointing at the
+  directory the shim was found in. libva treats this variable as a replacement
+  for its built-in list.
 - `NVD_DISABLE_DMABUF_FALLBACK_SOFTWARE=0` is set as well. The shim defaults to
   refusing NVIDIA's linear-only buffers, which is what a desktop compositor
   usually hands over; allowing the software fallback for those buffers is the

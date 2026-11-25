@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.4
+
+- Added optional Patreon support links to the service chooser and About dialog.
+- Report invalid update feeds instead of silently ignoring a missing version.
+- Honor explicitly configured libva driver paths when detecting NVIDIA decoding support.
+- Fall back to the player's controls when direct playback fails, and log failures when no fallback is available.
+- Keep the title bar in sync when its own insertion coincides with other page mutations.
+- Reviewed and simplified code comments and added regression tests.
+
 ## 0.9.0
 
 - Added favorite services and custom ordering, saved in the service chooser.

@@ -4,47 +4,12 @@ const { app, session } = require('electron');
 const log = require('./logger');
 const i18n = require('./i18n');
 
-/**
- * Presents the client as a current Chrome on the platform the active service
- * expects. Every service keeps its own partition (see src/services.js), so
- * each partition gets the identity its service asks for.
- *
- * The disguise has to be consistent on three levels, because each one is
- * checked independently:
- *
- *   1. The `User-Agent` request header. Stripping `Electron/x.y.z` is not
- *      enough; the platform token also has to match the claimed platform.
- *   2. The User-Agent Client Hints (`sec-ch-ua*`). Real Chrome sends them on
- *      every request; Electron sends none at all, which is itself a tell.
- *   3. The page-side `navigator` properties (`platform`, `userAgentData`).
- *      The site can read them from JavaScript, and they would otherwise keep
- *      reporting the real platform while the headers claim another one.
- *
- * The platform itself is a per-service choice:
- *
- *   - Windows (`disneyplus`, `appletv`): the player refuses to start on a user
- *     agent that advertises Electron, and both services refuse or throttle
- *     clients they identify as Linux (Disney+ serves lower resolutions; Apple
- *     TV+ fails with a generic playback error).
- *   - Linux (`netflix`): Netflix compares the claimed platform against the one
- *     the Widevine CDM reports inside the licence request (`platform_name:
- *     Linux`). Claiming Windows breaks the licence exchange — playback fails
- *     with E100 and, on resume, with M7111-1957-205064.
- *
- * The version tokens mirror the Chrome stable build used for testing, so the
- * client presents itself as a current, ordinary Chrome on the claimed platform.
- *
- * This is a compatibility measure only; the client still loads the services'
- * own web apps and performs no request rewriting beyond these identity headers.
- */
-
-// Chrome stable used as the reference for this build.
+// Services check headers, client hints and navigator independently; they must agree.
+// Netflix also checks the claimed platform against the Linux Widevine CDM.
 const CHROME_MAJOR = '156';
 const CHROME_FULL = '156.0.8078.47';
 
-// The identities the app can assume. The three platform values of an entry
-// always have to agree with each other, otherwise the disguise contradicts
-// itself and the service treats the client as tampered with.
+// Platform fields must agree across the request and page identities.
 const IDENTITIES = {
   windows: {
     // Windows 10 and 11 both report NT 10.0; Win64/x64 covers either.
@@ -90,24 +55,14 @@ const FULL_VERSION_LIST = [
   { brand: 'Google Chrome', version: CHROME_FULL },
 ];
 
-/**
- * Builds the self-contained expression for `webContents.executeJavaScript`
- * that rewrites the page-side `navigator` properties for one identity and
- * language. It is evaluated in the page's main world before any of the site's
- * own scripts run. A preload script cannot be used here: it runs in an
- * isolated world and its changes to `navigator` are invisible to the player.
- */
+// The isolated preload world cannot change the player's navigator.
 function navigatorPatchSource(identity, languages) {
   return `(() => {
-  // The guard compares identity *and* language: switching the language
-  // re-runs the patch on pages that are already open, which has to redefine
-  // the getters, while a repeated navigation with the same values must not.
+  // Language changes require new getters even when the identity is unchanged.
   const tag = ${JSON.stringify(`${identity.navigatorPlatform}|${languages.join(',')}`)};
   if (window.__veyloUAPatched === tag) return true;
   window.__veyloUAPatched = tag;
 
-  // The same ordered list the Accept-Language header carries, so what the page
-  // reads from JavaScript and what the header claims cannot disagree.
   const languageTags = ${JSON.stringify(languages)};
   const brands = ${JSON.stringify(BRANDS)};
   const fullVersionList = ${JSON.stringify(FULL_VERSION_LIST)};
@@ -161,27 +116,15 @@ function navigatorPatchSource(identity, languages) {
 })()`;
 }
 
-// Each service keeps its own partition (see src/services.js), so every
-// partition gets the identity of the service that owns it.
 const applied = new Map(); // partition -> { identity, session, userAgent }
-// Every window and popup the patch handler sees, so a language switch can also
-// update the pages that are open right now.
+// Track open pages so language changes can update them.
 const openContents = new Set();
 let navigatorPatchInstalled = false;
 
-/** The registered identity for a webContents' session, or null. */
 function entryFor(contents) {
   return [...applied.values()].find((item) => item.session === contents.session) || null;
 }
 
-/**
- * Applies the given identity to `app`, to every request in the given
- * partition (the main window and the sign-in popups share it), and patches the
- * page-side `navigator` properties in every document of that partition.
- *
- * Safe to call again for another partition: the app-wide parts are installed
- * once, the per-partition parts once per partition.
- */
 function applyUserAgent(partition, identityName) {
   if (applied.has(partition)) return;
 
@@ -190,8 +133,7 @@ function applyUserAgent(partition, identityName) {
 
   app.userAgentFallback = userAgent;
   const ses = session.fromPartition(partition);
-  // setUserAgent takes the Accept-Language list as well, so the header and the
-  // navigator patch below start out on the same language (src/i18n.js).
+  // Keep the header and navigator language aligned.
   ses.setUserAgent(userAgent, i18n.acceptLanguages().join(','));
   applied.set(partition, { identity, session: ses, userAgent });
 
@@ -205,10 +147,7 @@ function applyUserAgent(partition, identityName) {
     callback({ requestHeaders: headers });
   });
 
-  // Covers the main window and every popup created afterwards. Installed once:
-  // the handler is app-wide, and a second one would run the patch twice. The
-  // identity is resolved per navigation because the handler cannot know which
-  // service a new webContents belongs to.
+  // The app-wide handler resolves each page's identity from its session.
   if (!navigatorPatchInstalled) {
     navigatorPatchInstalled = true;
     app.on('web-contents-created', (_event, webContents) => {
@@ -232,14 +171,6 @@ function applyUserAgent(partition, identityName) {
   log.debug(`User agent presented to ${partition}: ${userAgent}`);
 }
 
-/**
- * Applies the active interface language to everything that carries it: the
- * Accept-Language header of every session (setUserAgent takes the user agent
- * and the language list together, so the identity stays untouched) and the
- * navigator.language of every page that is open. Called when the language is
- * switched at runtime; a partition created later picks the current language up
- * in applyUserAgent().
- */
 function applyBrowserLanguage() {
   const languages = i18n.acceptLanguages();
   const header = languages.join(',');

@@ -3,9 +3,7 @@
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 
-// electron must be stubbed before updater.js is required: the real module
-// resolves to the path of the Electron binary (and throws when the binary is
-// not downloaded, as in CI), while the updater only needs a handful of APIs.
+// The Node test runner cannot use Electron's main-process APIs.
 const electronPath = require.resolve('electron');
 require.cache[electronPath] = {
   id: electronPath,
@@ -99,5 +97,17 @@ describe('Updater.check', () => {
     assert.equal(result.status, 'error');
     assert.match(result.error, /offline/);
     assert.equal(warn.mock.callCount(), 1);
+  });
+
+  it('reports an invalid feed without a version as an error', async (t) => {
+    t.mock.method(globalThis, 'fetch', async () => new Response('{}'));
+    const warn = t.mock.method(log, 'warn', () => {});
+    const showMessageBox = t.mock.method(require('electron').dialog, 'showMessageBox', async () => ({ response: 0 }));
+    const result = await new Updater().check({ interactive: true });
+    assert.equal(result.status, 'error');
+    assert.match(result.error, /version/);
+    assert.equal(warn.mock.callCount(), 1);
+    assert.equal(showMessageBox.mock.callCount(), 1);
+    assert.equal(showMessageBox.mock.calls[0].arguments[1].type, 'warning');
   });
 });

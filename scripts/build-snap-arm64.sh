@@ -1,28 +1,6 @@
 #!/usr/bin/env bash
-#
-# Builds dist/snap/veylo_<version>_arm64.snap — the arm64 package of the local
-# multi-arch snap batch, for manual upload to the Snap Store.
-#
-# Why this exists: electron-builder's snap target packs from a prebuilt
-# template that only exists for amd64 (and armhf); for arm64 it shells out to
-# `snapcraft`, which needs a build provider (LXD/multipass) that is not
-# available here. So this script does what electron-builder would do, by hand:
-#
-#   1. download castLabs Electron for linux-arm64 (postinstall only fetches
-#      the host architecture),
-#   2. pack the application with `electron-builder --dir --arm64`,
-#   3. seed every arch-independent file (launcher scripts, desktop entry,
-#      icon, snap.yaml) byte-for-byte from the amd64 snap, so the arm64
-#      package can only differ in architecture and library triplet,
-#   4. fill the template's runtime libraries with their Ubuntu 20.04 (focal —
-#      the same release as the snap's core20 base) arm64 builds from
-#      ports.ubuntu.com, laid out exactly like the x64 template does,
-#   5. pack with the same mksquashfs flags electron-builder uses.
-#
-# castLabs Electron ships only linux-x64 and linux-arm64 binaries, so arm64 is
-# the only architecture besides amd64 that can carry Widevine at all — see the
-# architecture table in docs/SNAP.md.
-#
+# electron-builder's arm64 snap requires a build provider; reuse the amd64
+# template and core20-compatible arm64 libraries instead. See docs/SNAP.md.
 # Requires: curl, unzip, dpkg-deb, mksquashfs, unsquashfs (squashfs-tools),
 # node. No root, no snapcraft, no build provider.
 
@@ -114,11 +92,7 @@ cp -a "$APP/." "$STAGE/"
 # not shipped in snaps: the Chromium setuid sandbox (snap confinement replaces
 # it) and the flattened license texts electron-builder drops as well
 rm -f "$STAGE/chrome-sandbox" "$STAGE/LICENSES.chromium.html" "$STAGE/LICENSE.electron.txt"
-# abstract-socket only ships an x86_64 binary and has no arm64 build in the
-# dependency tree; it is loaded exclusively for `unix:abstract=` D-Bus
-# addresses, which the strictly confined snap cannot use anyway (no dbus
-# plug — see "Confinement notes" in docs/SNAP.md), so it is dropped rather
-# than shipped with a wrong-architecture ELF.
+# The x86-only abstract-socket binding cannot serve confined snap D-Bus addresses.
 rm -f "$STAGE/resources/app.asar.unpacked/node_modules/abstract-socket/build/Release/bindings.node"
 
 # arch-independent files, byte-identical to the amd64 snap

@@ -88,6 +88,15 @@
       }
     }
   },
+  "support": {
+    "title": "Support Veylo",
+    "teaser": "Enjoying Veylo? Help support independent open-source development.",
+    "button": "Become a Patreon supporter",
+    "shortOptional": "Support is optional.",
+    "description": "I build free and open-source software independently. Your support helps me develop, improve and maintain these projects.",
+    "optional": "All applications remain free and open source. Supporting is entirely optional.",
+    "openFailed": "Could not open the Patreon page in your browser."
+  },
   "picker": {
     "heading": "Choose a streaming service",
     "subtitle": "Veylo opens the official web player of the service you pick.",

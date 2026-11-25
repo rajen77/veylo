@@ -2,21 +2,7 @@
 
 const path = require('node:path');
 
-/**
- * Registry of the streaming services the client can wrap.
- *
- * Everything that varies between services lives here: the page that is loaded,
- * the session partition it keeps (so each service stays signed in on its own),
- * the platform identity the client presents itself as (see src/user-agent.js),
- * the hosts it may reach, and the icon the startup picker shows. src/security.js
- * turns the host lists into the navigation allowlist; the picker, the menu and
- * the window all read the rest.
- *
- * Adding a service is a matter of adding an entry with its icon under assets/.
- */
-
-// Hosts every service legitimately needs: DRM licence delivery and the CDN
-// families shared across providers.
+// Shared DRM and CDN hosts supplement each service's navigation allowlist.
 const SHARED_HOST_SUFFIXES = [
   'widevine.com', // licence proxy endpoints
   'googleapis.com', // Widevine licence backend
@@ -37,11 +23,9 @@ const SERVICES = [
     name: 'Disney+',
     startUrl: 'https://www.disneyplus.com/',
     backgroundColor: '#040814',
-    // The original partition name is kept so that sign-ins made before the
-    // service picker existed survive the change.
+    // Preserve sign-ins created before service-specific partitions.
     partition: 'persist:veylo',
-    // Disney+ drops Linux clients to low resolutions and refuses to start on an
-    // Electron user agent, so this service is presented as Windows Chrome.
+    // Disney+ restricts Linux playback and rejects Electron's user agent.
     identity: 'windows',
     icon: path.join(__dirname, '..', 'assets', 'disneyplus.jpg'),
     allowedHostSuffixes: [
@@ -74,11 +58,7 @@ const SERVICES = [
     startUrl: 'https://www.netflix.com/',
     backgroundColor: '#141414',
     partition: 'persist:veylo-netflix',
-    // Netflix checks the platform claim against the one the Widevine CDM puts
-    // in the licence request, which is always `Linux` on this platform. A
-    // Windows claim fails that check: playback ends with error E100 (and with
-    // M7111-1957-205064 when a title is resumed), so this service keeps the
-    // real platform and only drops the Electron token from the user agent.
+    // Netflix checks the claimed platform against the Linux Widevine CDM.
     identity: 'linux',
     icon: path.join(__dirname, '..', 'assets', 'netflix.jpg'),
     allowedHostSuffixes: [
@@ -101,10 +81,7 @@ const SERVICES = [
     startUrl: 'https://www.max.com/',
     backgroundColor: '#080814',
     partition: 'persist:veylo-hbomax',
-    // Max plays in Chrome on Linux with Widevine and does not reject an
-    // Electron-flavoured user agent, so the real platform is kept — the same
-    // reasoning as Netflix: the Widevine CDM reports `Linux` in the licence
-    // request, and a contradicting claim risks breaking the DRM exchange.
+    // Keep the platform consistent with Widevine's Linux identity.
     identity: 'linux',
     icon: path.join(__dirname, '..', 'assets', 'hbomax.jpg'),
     allowedHostSuffixes: [
@@ -125,11 +102,7 @@ const SERVICES = [
     startUrl: 'https://tv.apple.com/',
     backgroundColor: '#000000',
     partition: 'persist:veylo-appletv',
-    // Apple TV+ refuses to play on a Linux identity (the player surfaces a
-    // generic "An Error Occurred" and never starts), so the service is
-    // presented as Windows Chrome — the same approach as Disney+. Unlike
-    // Netflix, Apple does not appear to cross-check the platform the Widevine
-    // CDM reports in the licence request, so the spoof does not break DRM.
+    // Apple TV+ rejects Linux browser identities.
     identity: 'windows',
     icon: path.join(__dirname, '..', 'assets', 'appletv.jpg'),
     allowedHostSuffixes: [
@@ -148,18 +121,12 @@ const SERVICES = [
     startUrl: 'https://www.primevideo.com/',
     backgroundColor: '#0f171e',
     partition: 'persist:veylo-primevideo',
-    // Prime Video's player runs in a regular browser on Linux, so the real
-    // platform is kept — the same reasoning as Netflix and Max: the Widevine
-    // CDM reports `Linux` in the licence request, and a contradicting claim
-    // risks breaking the DRM exchange.
     identity: 'linux',
     icon: path.join(__dirname, '..', 'assets', 'primevideo.jpg'),
     allowedHostSuffixes: [
       'primevideo.com', // site, sign-in, account, playback and media APIs
       'amazonvideo.com', // legacy brand endpoints still referenced by the player
-      // Sign-in and account live on the regional amazon domains: the site
-      // redirects to amazon.<tld>/ap/signin for the caller's region, so the
-      // region set has to be covered as well as the main domains.
+      // Sign-in redirects to the user's regional Amazon domain.
       'amazon.com',
       'amazon.co.uk',
       'amazon.de',
@@ -188,9 +155,6 @@ const SERVICES = [
       'a2z.com', // playback service endpoints (video.a2z.com)
       'doubleclick.net', // required by the player's analytics stack
     ],
-    // No externalHostSuffixes: the player's links (help, account, terms of
-    // use) are all on primevideo.com or amazon.*, which are already allowed
-    // above, so nothing needs to open in the system browser.
   },
   {
     id: 'skyshowtime',
@@ -198,21 +162,14 @@ const SERVICES = [
     startUrl: 'https://www.skyshowtime.com/',
     backgroundColor: '#0b1220',
     partition: 'persist:veylo-skyshowtime',
-    // The 22 countries whose content the service's own sitemap lists
-    // (skyshowtime.com/sitemap.xml); outside them the site has no catalogue.
+    // The catalogue regions are listed in skyshowtime.com/sitemap.xml.
     availableIn: ['AD', 'AL', 'BA', 'BG', 'CZ', 'DK', 'ES', 'FI', 'HR', 'HU', 'ME', 'MK', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'SE', 'SI', 'SK', 'XK'],
-    // SkyShowtime's web player runs in a regular browser on Linux, so the real
-    // platform is kept — the same reasoning as Netflix, Max and Prime Video:
-    // the Widevine CDM reports `Linux` in the licence request, and a
-    // contradicting claim risks breaking the DRM exchange.
     identity: 'linux',
     icon: path.join(__dirname, '..', 'assets', 'skyshowtime.jpg'),
     allowedHostSuffixes: [
       'skyshowtime.com', // site, sign-in (auth.*), account, playback APIs (sas.skyshowtime.com)
       'skyshowtime.net', // service endpoints referenced by the player
     ],
-    // No externalHostSuffixes: help/FAQ links live on skyshowtime.com itself,
-    // which is already allowed above.
   },
   {
     id: 'crunchyroll',
@@ -220,10 +177,6 @@ const SERVICES = [
     startUrl: 'https://www.crunchyroll.com/',
     backgroundColor: '#1f1f1f',
     partition: 'persist:veylo-crunchyroll',
-    // Crunchyroll's web player runs in a regular browser on Linux, so the real
-    // platform is kept — the same reasoning as Netflix, Max, Prime Video and
-    // SkyShowtime: the Widevine CDM reports `Linux` in the licence request, and
-    // a contradicting claim risks breaking the DRM exchange.
     identity: 'linux',
     icon: path.join(__dirname, '..', 'assets', 'crunchyroll.jpg'),
     allowedHostSuffixes: [
@@ -231,8 +184,6 @@ const SERVICES = [
       'crunchyroll.net', // static assets and media delivery
       'crunchyroll.tv', // short links referenced by the player
     ],
-    // No externalHostSuffixes: help links live on help.crunchyroll.com, which
-    // the `crunchyroll.com` suffix above already covers.
   },
   {
     id: 'plutotv',
@@ -240,15 +191,8 @@ const SERVICES = [
     startUrl: 'https://pluto.tv/',
     backgroundColor: '#1b1145',
     partition: 'persist:veylo-plutotv',
-    // Pluto TV streams in 30 countries (its own region list, pluto.tv/sitemap/):
-    // the US, Canada, the UK, parts of Western and Northern Europe and Latin
-    // America. Hungary is not one of them, so the service is not offered here.
+    // Catalogue regions follow pluto.tv/sitemap/.
     availableIn: ['US', 'CA', 'GB', 'DE', 'AT', 'CH', 'FR', 'IT', 'ES', 'DK', 'NO', 'SE', 'AR', 'BO', 'BR', 'CL', 'CO', 'CR', 'DO', 'EC', 'SV', 'GT', 'HN', 'MX', 'NI', 'PA', 'PY', 'PE', 'UY', 'VE'],
-    // Pluto TV's web player runs in a regular browser on Linux, so the real
-    // platform is kept — the same reasoning as Netflix, Max, Prime Video,
-    // SkyShowtime and Crunchyroll: the Widevine CDM reports `Linux` in the
-    // licence request, and a contradicting claim risks breaking the DRM
-    // exchange.
     identity: 'linux',
     icon: path.join(__dirname, '..', 'assets', 'plutotv.jpg'),
     allowedHostSuffixes: [
@@ -259,8 +203,6 @@ const SERVICES = [
       'adobedc.net', // Adobe Experience Platform consent/analytics (data.adobedc.net)
       'datadoghq.com', // client-side telemetry
     ],
-    // No externalHostSuffixes: help and legal links live on pluto.tv itself,
-    // which is already allowed above.
   },
   {
     id: 'tubi',
@@ -268,17 +210,8 @@ const SERVICES = [
     startUrl: 'https://tubitv.com/',
     backgroundColor: '#160b04',
     partition: 'persist:veylo-tubi',
-    // Tubi streams in 12 countries (its help page for devices outside the US).
-    // The whole EU has been excluded since the GDPR took effect in 2018, so
-    // the service is not offered here.
+    // Regions follow Tubi's help page for devices outside the US.
     availableIn: ['US', 'CA', 'MX', 'GB', 'AU', 'NZ', 'PR', 'CR', 'EC', 'SV', 'GT', 'PA'],
-    // Tubi's web player runs in a regular browser on Linux, so the real
-    // platform is kept — the same reasoning as Netflix, Max, Prime Video,
-    // SkyShowtime, Crunchyroll and Pluto TV: the Widevine CDM reports `Linux`
-    // in the licence request, and a contradicting claim risks breaking the
-    // DRM exchange. Note that Tubi is not offered in the EU: from an EU IP
-    // the service answers with the gdpr.tubi.tv interstitial instead of the
-    // catalogue, which the allowlist below covers.
     identity: 'linux',
     icon: path.join(__dirname, '..', 'assets', 'tubi.jpg'),
     allowedHostSuffixes: [
@@ -286,8 +219,6 @@ const SERVICES = [
       'tubi.tv', // service endpoints and the GDPR interstitial (gdpr.tubi.tv)
       'tubi.io', // media delivery and previews (video-previews-cdn.production-public.tubi.io)
     ],
-    // No externalHostSuffixes: help links live on tubitv.com itself, which
-    // is already allowed above.
   },
   {
     id: 'peacock',
@@ -295,15 +226,8 @@ const SERVICES = [
     startUrl: 'https://www.peacocktv.com/',
     backgroundColor: '#0a0a0a',
     partition: 'persist:veylo-peacock',
-    // Peacock streams in the United States and five US territories only;
-    // anywhere else the site answers with its "Unavailable In Your Region"
-    // page, so the service is offered only there (see availableIn).
     availableIn: ['US', 'AS', 'GU', 'MP', 'PR', 'VI'],
-    // Peacock's help lists its browsers as Chrome/Firefox/Edge on Windows and
-    // Mac only — no Linux — so the service is presented as Windows Chrome, the
-    // same approach as Disney+ and Apple TV+. Unlike Netflix, NBCUniversal
-    // does not appear to cross-check the platform the Widevine CDM reports in
-    // the licence request, so the spoof does not break DRM.
+    // Peacock's supported desktop browsers exclude Linux.
     identity: 'windows',
     icon: path.join(__dirname, '..', 'assets', 'peacock.jpg'),
     allowedHostSuffixes: [
@@ -328,15 +252,9 @@ const SERVICES = [
     startUrl: 'https://www.paramountplus.com/',
     backgroundColor: '#001438',
     partition: 'persist:veylo-paramountplus',
-    // The 28 countries on the service's own global page
-    // (paramountplus.com/global/), plus the US home market. From anywhere else
-    // the site redirects to the country picker instead of a catalogue.
+    // Regions follow paramountplus.com/global/ and include the US home market.
     availableIn: ['US', 'AR', 'AT', 'AU', 'BO', 'BR', 'CA', 'CH', 'CL', 'CO', 'CR', 'DE', 'DO', 'EC', 'FR', 'GB', 'GT', 'HN', 'HU', 'IE', 'IT', 'MX', 'NI', 'PA', 'PE', 'PY', 'SV', 'UY', 'VE'],
-    // Paramount+'s help lists its desktop browsers as Chrome on Windows and
-    // Mac only — no Linux — so the service is presented as Windows Chrome, the
-    // same approach as Disney+, Apple TV+ and Peacock. Unlike Netflix,
-    // Paramount does not appear to cross-check the platform the Widevine CDM
-    // reports in the licence request, so the spoof does not break DRM.
+    // Paramount+'s supported desktop browsers exclude Linux.
     identity: 'windows',
     icon: path.join(__dirname, '..', 'assets', 'paramountplus.jpg'),
     allowedHostSuffixes: [
@@ -408,20 +326,16 @@ function getService(id) {
   return SERVICES.find((service) => service.id === id) || null;
 }
 
-/** The full allowlist for a service: its own hosts plus the shared ones. */
 function allowedHostSuffixes(service) {
   if (!service) return [];
   return [...(service.allowedHostSuffixes || []), ...SHARED_HOST_SUFFIXES];
 }
 
-/** The service a window should show: the requested one, or the default. */
 function resolveService(id) {
   return getService(id) || getService(DEFAULT_SERVICE_ID);
 }
 
 /**
- * Whether the service streams in the given country.
- *
  * A service without an `availableIn` list is treated as available everywhere.
  * A restricted service returns false for an unknown country; callers should
  * distinguish unknown from confirmed unavailability when displaying it.
@@ -435,12 +349,10 @@ function availableInRegion(service, country) {
   return service.availableIn.includes(country);
 }
 
-/** The registry in order, minus the services that do not stream here. */
 function visibleServices(country) {
   return SERVICES.filter((service) => availableInRegion(service, country));
 }
 
-/** Ordered services, with favourites first and optional regional hiding. */
 function orderedServices(prefs, country) {
   const order = new Map((prefs.serviceOrder || []).map((id, index) => [id, index]));
   const favorites = new Set(prefs.favorites || []);
